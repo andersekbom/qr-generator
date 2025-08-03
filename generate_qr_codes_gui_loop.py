@@ -8,10 +8,82 @@ from tkinter import filedialog, messagebox, simpledialog
 import re
 from tqdm import tqdm
 import xml.etree.ElementTree as ET
+from datetime import datetime
 
 import PIL
 from PIL import Image, ImageDraw
 
+
+def validate_integer_input(value, field_name, min_value=1, max_value=None):
+    """Validate integer input with range checking"""
+    try:
+        int_value = int(value)
+        if int_value < min_value:
+            return False, f"{field_name} must be at least {min_value}"
+        if max_value is not None and int_value > max_value:
+            return False, f"{field_name} must be at most {max_value}"
+        return True, int_value
+    except (ValueError, TypeError):
+        return False, f"{field_name} must be a valid number"
+
+def validate_date_format(date_str):
+    """Validate date format (DD.MM.YY)"""
+    if not date_str:
+        return False, "Date cannot be empty"
+    
+    # Check basic format
+    if not re.match(r'^\d{2}\.\d{2}\.\d{2}$', date_str):
+        return False, "Date must be in DD.MM.YY format (e.g., 26.12.31)"
+    
+    try:
+        # Parse and validate the date
+        day, month, year = map(int, date_str.split('.'))
+        
+        # Add 2000 to year for proper datetime validation
+        full_year = 2000 + year
+        datetime(full_year, month, day)
+        
+        return True, date_str
+    except ValueError:
+        return False, "Invalid date. Please check day, month values."
+
+def validate_color_format(color_str):
+    """Validate color format (hex or CSS color name)"""
+    if not color_str:
+        return False, "Color cannot be empty"
+    
+    # Check hex format
+    if color_str.startswith('#'):
+        if len(color_str) not in [4, 7]:  # #RGB or #RRGGBB
+            return False, "Hex color must be #RGB or #RRGGBB format"
+        try:
+            int(color_str[1:], 16)
+            return True, color_str
+        except ValueError:
+            return False, "Invalid hex color format"
+    
+    # Allow common CSS color names
+    css_colors = {
+        'black', 'white', 'red', 'green', 'blue', 'yellow', 'cyan', 'magenta',
+        'silver', 'gray', 'maroon', 'olive', 'lime', 'aqua', 'teal', 'navy',
+        'fuchsia', 'purple', 'orange', 'brown', 'pink', 'gold'
+    }
+    
+    if color_str.lower() in css_colors:
+        return True, color_str
+    
+    return False, "Color must be hex format (#RGB or #RRGGBB) or CSS color name"
+
+def validate_format(format_str):
+    """Validate output format"""
+    if not format_str:
+        return False, "Format cannot be empty"
+    
+    valid_formats = ['png', 'svg']
+    if format_str.lower() not in valid_formats:
+        return False, f"Format must be one of: {', '.join(valid_formats)}"
+    
+    return True, format_str.lower()
 
 def detect_delimiter(file_path):
     with open(file_path, "r") as infile:
@@ -199,8 +271,22 @@ def main():
             delimiter = simpledialog.askstring("Input", f"Enter separator [{detected_delimiter}]:") or detected_delimiter
             input_column = simpledialog.askinteger("Input", "Enter 0-indexed input column [0]:", initialvalue=0)
             skip_first_row = messagebox.askyesno("Input", "Skip first row?")
-            format = simpledialog.askstring("Input", "Image format [png,svg]:", initialvalue="png")
-            color = simpledialog.askstring("Input", "Image color [hex or name]:", initialvalue="#000000")
+            
+            # Validate format
+            format_input = simpledialog.askstring("Input", "Image format [png,svg]:", initialvalue="png")
+            format_valid, format_result = validate_format(format_input)
+            if not format_valid:
+                messagebox.showerror("Validation Error", format_result)
+                return
+            format = format_result
+            
+            # Validate color
+            color_input = simpledialog.askstring("Input", "Image color [hex or name]:", initialvalue="#000000")
+            color_valid, color_result = validate_color_format(color_input)
+            if not color_valid:
+                messagebox.showerror("Validation Error", color_result)
+                return
+            color = color_result
             
             # Read CSV data
             with open(input_file, "r") as infile:
@@ -240,27 +326,69 @@ def main():
             return
     
     # Manual parameter input mode
-    valid_uses = simpledialog.askstring("Input", "Enter Valid uses (e.g. 15):")
-    if not valid_uses:
+    # Validate valid_uses
+    valid_uses_input = simpledialog.askstring("Input", "Enter Valid uses (e.g. 15):")
+    if not valid_uses_input:
         messagebox.showerror("Error", "No valid uses entered. Exiting.")
         return
+    
+    valid_uses_valid, valid_uses_result = validate_integer_input(valid_uses_input, "Valid uses", 1, 9999)
+    if not valid_uses_valid:
+        messagebox.showerror("Validation Error", valid_uses_result)
+        return
+    valid_uses = str(valid_uses_result)
 
-    volume = simpledialog.askstring("Input", "Enter Volume (e.g. 500):")
-    if not volume:
+    # Validate volume
+    volume_input = simpledialog.askstring("Input", "Enter Volume (e.g. 500):")
+    if not volume_input:
         messagebox.showerror("Error", "No volume entered. Exiting.")
         return
+    
+    volume_valid, volume_result = validate_integer_input(volume_input, "Volume", 1, 99999)
+    if not volume_valid:
+        messagebox.showerror("Validation Error", volume_result)
+        return
+    volume = str(volume_result)
 
-    end_date = simpledialog.askstring("Input", "Enter Valid Until date:", initialvalue="26.12.31")
-    if not end_date:
+    # Validate end_date
+    end_date_input = simpledialog.askstring("Input", "Enter Valid Until date:", initialvalue="26.12.31")
+    if not end_date_input:
         messagebox.showerror("Error", "No end date entered. Exiting.")
         return
-
-    color = simpledialog.askstring("Input", "Image color [hex or name]:", initialvalue="#000000")
-    format = simpledialog.askstring("Input", "Image format [png,svg]:", initialvalue="png")
-    count = simpledialog.askinteger("Input", "How many QR codes to generate?", initialvalue=1)
-    if not count or count < 1:
-        messagebox.showerror("Error", "Invalid count. Exiting.")
+    
+    date_valid, date_result = validate_date_format(end_date_input)
+    if not date_valid:
+        messagebox.showerror("Validation Error", date_result)
         return
+    end_date = date_result
+
+    # Validate color
+    color_input = simpledialog.askstring("Input", "Image color [hex or name]:", initialvalue="#000000")
+    color_valid, color_result = validate_color_format(color_input)
+    if not color_valid:
+        messagebox.showerror("Validation Error", color_result)
+        return
+    color = color_result
+    
+    # Validate format
+    format_input = simpledialog.askstring("Input", "Image format [png,svg]:", initialvalue="png")
+    format_valid, format_result = validate_format(format_input)
+    if not format_valid:
+        messagebox.showerror("Validation Error", format_result)
+        return
+    format = format_result
+    
+    # Validate count
+    count = simpledialog.askinteger("Input", "How many QR codes to generate?", initialvalue=1)
+    if not count:
+        messagebox.showerror("Error", "No count entered. Exiting.")
+        return
+    
+    count_valid, count_result = validate_integer_input(count, "Count", 1, 10000)
+    if not count_valid:
+        messagebox.showerror("Validation Error", count_result)
+        return
+    count = count_result
 
     # Ask for payload customization options
     security_code = simpledialog.askstring("Input", "Enter security code:", initialvalue="SECD")
