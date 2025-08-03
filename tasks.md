@@ -91,11 +91,11 @@ Base file: `generate_qr_codes_gui_loop.py`
 
 ## File Management Enhancements
 
-### Task 13: Add output directory selection
+### Task 13: Add output directory selection ✅ COMPLETED
 **Start**: Add dialog to choose output directory instead of hardcoded "output"  
 **End**: User can specify where generated files are saved  
 **Test**: Select different output directories, verify files saved correctly  
-**Current**: Hardcoded "output" directory
+**Status**: ✅ Added output directory selection to both CSV and manual modes. Added "Choose custom output directory?" dialog with filedialog.askdirectory() for directory selection. Fallback to default "output" directory if no selection made or dialog cancelled. Added informative message when falling back to default. Enhanced both modes with consistent directory selection workflow. Tests created in `tests/test_output_directory_selection.py` verify custom directory usage, fallback behavior, and directory creation
 
 ### Task 14: Add filename customization options
 **Start**: Add options for custom filename patterns/prefixes  

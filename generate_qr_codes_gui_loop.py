@@ -378,12 +378,21 @@ def main():
                 messagebox.showerror("Error", "No data found in CSV file.")
                 return
                 
+            # Output directory selection
+            use_custom_output = messagebox.askyesno("Output Directory", "Choose custom output directory?\n\nYes = Select directory\nNo = Use default 'output' folder")
+            output_folder = "output"
+            
+            if use_custom_output:
+                selected_dir = filedialog.askdirectory(title="Select Output Directory")
+                if selected_dir:
+                    output_folder = selected_dir
+                else:
+                    messagebox.showinfo("Info", "No directory selected. Using default 'output' folder.")
+            
             zip_output = messagebox.askyesno("Input", "Add output files to a zip file?")
             zip_file_name = None
             if zip_output:
                 zip_file_name = simpledialog.askstring("Input", f"Enter zip file name [output_{format}.zip]:", initialvalue=f"output_{format}.zip")
-            
-            output_folder = "output"
             
             # For CSV mode, we don't use the sequential payload format, so we skip security_code and suffix_code
             # Generate QR codes from CSV data
@@ -517,12 +526,22 @@ def main():
             return
         border = border_result
 
+    # Output directory selection
+    use_custom_output = messagebox.askyesno("Output Directory", "Choose custom output directory?\n\nYes = Select directory\nNo = Use default 'output' folder")
+    output_folder = "output"
+    
+    if use_custom_output:
+        selected_dir = filedialog.askdirectory(title="Select Output Directory")
+        if selected_dir:
+            output_folder = selected_dir
+        else:
+            messagebox.showinfo("Info", "No directory selected. Using default 'output' folder.")
+
     zip_output = messagebox.askyesno("Input", "Add output files to a zip file?")
     zip_file_name = None
     if zip_output:
         zip_file_name = simpledialog.askstring("Input", f"Enter zip file name:", initialvalue=f"QR-{valid_uses}-{volume}-{color}-{count}-{format}.zip")
 
-    output_folder = "output"
     try:
         create_qr_codes(valid_uses, volume, end_date, color, output_folder, format, count, security_code=security_code, suffix_code=suffix_code, qr_version=qr_version, error_correction=error_correction, box_size=box_size, border=border)
         #messagebox.showinfo("Success", f"{count} QR codes generated successfully!")
