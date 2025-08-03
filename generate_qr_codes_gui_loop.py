@@ -120,12 +120,33 @@ def get_error_correction_level(level_str):
     }
     return levels.get(level_str.upper(), qrcode.constants.ERROR_CORRECT_L)
 
+def generate_custom_filename(base_name, prefix="", suffix="", use_payload_as_base=True, index=None):
+    """Generate custom filename with optional prefix/suffix"""
+    if use_payload_as_base:
+        # Create safe filename from payload/base_name
+        safe_base = "".join(c for c in base_name if c.isalnum() or c in (' ', '-', '_', '.')).rstrip('.')
+        if not safe_base:
+            safe_base = f"qr_code_{index}" if index is not None else "qr_code"
+    else:
+        # Use index-based naming
+        safe_base = f"qr_code_{index}" if index is not None else "qr_code"
+    
+    # Combine prefix, base, and suffix
+    filename_parts = []
+    if prefix:
+        filename_parts.append(prefix)
+    filename_parts.append(safe_base)
+    if suffix:
+        filename_parts.append(suffix)
+    
+    return "_".join(filename_parts)
+
 def detect_delimiter(file_path):
     with open(file_path, "r") as infile:
         sample = infile.read(1024)
         return csv.Sniffer().sniff(sample).delimiter
 
-def create_qr_codes(valid_uses, volume, end_date, color, output_folder, format, count, csv_data=None, input_column=0, security_code="SECD", suffix_code="23FF45EE", qr_version=None, error_correction="L", box_size=10, border=4):
+def create_qr_codes(valid_uses, volume, end_date, color, output_folder, format, count, csv_data=None, input_column=0, security_code="SECD", suffix_code="23FF45EE", qr_version=None, error_correction="L", box_size=10, border=4, filename_prefix="", filename_suffix="", use_payload_as_filename=True):
     """
     Create QR codes either from manual parameters or CSV data
     
@@ -138,6 +159,9 @@ def create_qr_codes(valid_uses, volume, end_date, color, output_folder, format, 
         error_correction: Error correction level (L, M, Q, H)
         box_size: Size of each QR code box in pixels
         border: Border size in boxes
+        filename_prefix: Prefix to add to generated filenames
+        filename_suffix: Suffix to add to generated filenames (before extension)
+        use_payload_as_filename: Whether to use payload content as filename base
         Other parameters: Used for manual mode or as defaults
     """
     os.makedirs(output_folder, exist_ok=True)
@@ -165,11 +189,12 @@ def create_qr_codes(valid_uses, volume, end_date, color, output_folder, format, 
 
             img = qr.make_image(fill_color=color, back_color="#FFFFFF", image_factory=factory)
 
-            # Create safe filename from payload
-            safe_filename = "".join(c for c in payload if c.isalnum() or c in (' ', '-', '_', '.')).rstrip()
-            if not safe_filename:
-                safe_filename = f"qr_code_{i+1}"
-            filename = os.path.join(output_folder, f"{safe_filename}.{format}")
+            # Generate custom filename
+            custom_filename = generate_custom_filename(
+                payload, filename_prefix, filename_suffix, 
+                use_payload_as_filename, i+1
+            )
+            filename = os.path.join(output_folder, f"{custom_filename}.{format}")
             img.save(filename)
             if format == 'svg':
                 colorize_svg(filename, color)
@@ -189,7 +214,12 @@ def create_qr_codes(valid_uses, volume, end_date, color, output_folder, format, 
 
             img = qr.make_image(fill_color=color, back_color="#000000", image_factory=factory)
 
-            filename = os.path.join(output_folder, f"{payload}.{format}")
+            # Generate custom filename
+            custom_filename = generate_custom_filename(
+                payload, filename_prefix, filename_suffix, 
+                use_payload_as_filename, i
+            )
+            filename = os.path.join(output_folder, f"{custom_filename}.{format}")
             img.save(filename)
             if format == 'svg':
                 colorize_svg(filename, color)
@@ -367,6 +397,15 @@ def main():
                     return
                 border = border_result
             
+            # Ask for filename customization options
+            customize_filenames = messagebox.askyesno("Filename Options", "Customize filename format?")
+            filename_prefix, filename_suffix, use_payload_as_filename = "", "", True
+            
+            if customize_filenames:
+                filename_prefix = simpledialog.askstring("Filename Options", "Enter filename prefix (optional):") or ""
+                filename_suffix = simpledialog.askstring("Filename Options", "Enter filename suffix (optional):") or ""
+                use_payload_as_filename = messagebox.askyesno("Filename Options", "Use CSV data as filename base?\n\nYes = Use data content\nNo = Use qr_code_1, qr_code_2, etc.")
+            
             # Read CSV data
             with open(input_file, "r") as infile:
                 reader = csv.reader(infile, delimiter=delimiter)
@@ -396,7 +435,7 @@ def main():
             
             # For CSV mode, we don't use the sequential payload format, so we skip security_code and suffix_code
             # Generate QR codes from CSV data
-            create_qr_codes(None, None, None, color, output_folder, format, None, csv_data=rows, input_column=input_column, qr_version=qr_version, error_correction=error_correction, box_size=box_size, border=border)
+            create_qr_codes(None, None, None, color, output_folder, format, None, csv_data=rows, input_column=input_column, qr_version=qr_version, error_correction=error_correction, box_size=box_size, border=border, filename_prefix=filename_prefix, filename_suffix=filename_suffix, use_payload_as_filename=use_payload_as_filename)
             
             messagebox.showinfo("Success", f"{len(rows)} QR codes generated successfully from CSV!")
             
@@ -526,6 +565,15 @@ def main():
             return
         border = border_result
 
+    # Ask for filename customization options
+    customize_filenames = messagebox.askyesno("Filename Options", "Customize filename format?")
+    filename_prefix, filename_suffix, use_payload_as_filename = "", "", True
+    
+    if customize_filenames:
+        filename_prefix = simpledialog.askstring("Filename Options", "Enter filename prefix (optional):") or ""
+        filename_suffix = simpledialog.askstring("Filename Options", "Enter filename suffix (optional):") or ""
+        use_payload_as_filename = messagebox.askyesno("Filename Options", "Use payload as filename base?\n\nYes = Use M-15-00000001-500-26.12.31-SECD-23FF45EE\nNo = Use qr_code_1, qr_code_2, etc.")
+
     # Output directory selection
     use_custom_output = messagebox.askyesno("Output Directory", "Choose custom output directory?\n\nYes = Select directory\nNo = Use default 'output' folder")
     output_folder = "output"
@@ -543,7 +591,7 @@ def main():
         zip_file_name = simpledialog.askstring("Input", f"Enter zip file name:", initialvalue=f"QR-{valid_uses}-{volume}-{color}-{count}-{format}.zip")
 
     try:
-        create_qr_codes(valid_uses, volume, end_date, color, output_folder, format, count, security_code=security_code, suffix_code=suffix_code, qr_version=qr_version, error_correction=error_correction, box_size=box_size, border=border)
+        create_qr_codes(valid_uses, volume, end_date, color, output_folder, format, count, security_code=security_code, suffix_code=suffix_code, qr_version=qr_version, error_correction=error_correction, box_size=box_size, border=border, filename_prefix=filename_prefix, filename_suffix=filename_suffix, use_payload_as_filename=use_payload_as_filename)
         #messagebox.showinfo("Success", f"{count} QR codes generated successfully!")
 
         #if zip_output:

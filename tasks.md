@@ -97,11 +97,11 @@ Base file: `generate_qr_codes_gui_loop.py`
 **Test**: Select different output directories, verify files saved correctly  
 **Status**: ✅ Added output directory selection to both CSV and manual modes. Added "Choose custom output directory?" dialog with filedialog.askdirectory() for directory selection. Fallback to default "output" directory if no selection made or dialog cancelled. Added informative message when falling back to default. Enhanced both modes with consistent directory selection workflow. Tests created in `tests/test_output_directory_selection.py` verify custom directory usage, fallback behavior, and directory creation
 
-### Task 14: Add filename customization options
+### Task 14: Add filename customization options ✅ COMPLETED
 **Start**: Add options for custom filename patterns/prefixes  
 **End**: User can customize how generated files are named  
 **Test**: Generate files with different naming patterns, verify names correct  
-**Current**: Uses payload as filename
+**Status**: ✅ Added comprehensive filename customization with prefix, suffix, and base name options. Enhanced create_qr_codes() function with filename_prefix, filename_suffix, and use_payload_as_filename parameters. Added generate_custom_filename() function with special character cleanup and safe filename generation. Added GUI dialogs in both CSV and manual modes with "Customize filename format?" option. CSV mode supports payload-based or index-based naming. Manual mode supports payload-based or qr_code_N naming. Tests created in `tests/test_filename_customization.py` verify all customization options, special character handling, and integration
 
 ### Task 15: Add selective file cleanup option
 **Start**: Make output folder cleanup optional via user choice  
