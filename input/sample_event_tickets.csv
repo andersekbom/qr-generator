@@ -1,0 +1,11 @@
+ticket_id;event_name;date;venue;seat;price
+TKT001;Tech Conference 2023;2023-12-15;Convention Center;A-15;150.00
+TKT002;Music Festival;2023-11-20;City Park;GA-001;85.00
+TKT003;Business Summit;2023-10-10;Hotel Ballroom;B-22;200.00
+TKT004;Art Exhibition;2023-09-25;Art Gallery;VIP-05;75.00
+TKT005;Sports Event;2023-12-01;Stadium;Section-C-Row-10-Seat-15;120.00
+TKT006;Workshop Series;2023-11-05;Training Center;Room-A;50.00
+TKT007;Networking Event;2023-10-30;Rooftop Venue;Standing;30.00
+TKT008;Product Launch;2023-12-20;Corporate HQ;Auditorium-Front;0.00
+TKT009;Training Session;2023-11-15;Office Complex;Conference-Room-B;100.00
+TKT010;Holiday Party;2023-12-25;Community Center;Table-5;25.00

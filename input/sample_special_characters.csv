@@ -1,0 +1,11 @@
+text,description
+"Hello World!",Basic punctuation
+"Special chars @#$%^&*()",Symbol characters
+"Unicode café résumé naïve",Accented characters
+"Emoji 🎉🚀💻📱",Unicode emoji
+"Mixed Tech@Company.com (2023)",Email with year
+"Line Break Test",Multiline text alternative
+"Quotes Hello World",Nested quotes alternative
+"Path C Windows System32",Windows path alternative
+"URL https://example.com?param=value",URL with parameters
+"JSON key value number 42",JSON structure alternative
