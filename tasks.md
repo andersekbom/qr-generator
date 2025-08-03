@@ -123,22 +123,22 @@ Base file: `generate_qr_codes_gui_loop.py`
 **Test**: Switch between modes, verify appropriate dialogs appear  
 **Status**: ✅ Redesigned the interface with clearer operation mode selection. Added three distinct modes: Single QR Code Generation (1 or few codes), Batch Sequential Generation (multiple codes with sequential parameters), and CSV Batch Generation (import from CSV file). Updated all dialog titles to reflect the current operation mode for better user experience. Enhanced count defaults (1 for single, 10 for batch). Created comprehensive tests in `tests/test_batch_operation_modes.py` covering all three modes and workflow testing. Updated existing tests to work with new dialog sequence
 
-### Task 18: Add format-specific options
+### Task 18: Add format-specific options ✅ COMPLETED
 **Start**: Show format-specific options (PNG quality, SVG precision) based on selection  
 **End**: Advanced options available per format type  
 **Test**: Select different formats, verify appropriate options shown  
-**New feature**
+**Status**: ✅ Added format-specific configuration options that appear based on output format. PNG format shows quality setting (0-100), SVG format shows precision setting (0-10 decimal places). Enhanced create_qr_codes() with png_quality and svg_precision parameters, updated colorize_svg() with precision formatting, added validation functions, integrated with preset system. Comprehensive test suite in test_format_options.py validates all functionality.
 
 ## Testing Infrastructure
 
-### Task 19: Add unit tests for core functions
+### Task 19: Add unit tests for core functions ✅ COMPLETED
 **Start**: Create test file with tests for detect_delimiter, create_qr_codes, colorize_svg  
 **End**: Comprehensive test coverage for all utility functions  
 **Test**: Run test suite, verify all functions work correctly  
-**New requirement**
+**Status**: ✅ Created comprehensive test suite in tests/test_core_functions.py covering all major core functions. Tests include: detect_delimiter() with all delimiter types, create_qr_codes() for manual/CSV modes with format-specific options, colorize_svg() with XML/precision handling and error recovery, all validation functions with edge cases, generate_custom_filename() with payload/index-based naming. 25+ test methods across 5 test classes, temporary file/directory management, all tests pass successfully.
 
-### Task 20: Add sample data for testing
+### Task 20: Add sample data for testing ✅ COMPLETED
 **Start**: Create sample CSV files and test data in input/ directory  
 **End**: Standardized test data available for development and testing  
 **Test**: Use sample data with application, verify correct processing  
-**New requirement**
+**Status**: ✅ Created comprehensive sample dataset with 7 new CSV files covering all delimiter types (comma, semicolon, tab, pipe) and various use cases (websites, contacts, WiFi, products, events, special characters, minimal data). Added input/README.md with detailed documentation and test_sample_data.py validation script. All 10 sample files pass validation testing, delimiter detection works correctly, QR generation successful for all samples. Supports testing of CSV parsing, column selection, header handling, Unicode characters, and performance scenarios.
