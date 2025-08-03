@@ -7,6 +7,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog
 import re
 from tqdm import tqdm
+import xml.etree.ElementTree as ET
 
 import PIL
 from PIL import Image, ImageDraw
@@ -85,12 +86,91 @@ def zip_output_files(output_folder, zip_file_name, format):
                     zipf.write(os.path.join(root, file), arcname=file)
     #messagebox.showinfo("Success", f"Output files added to zip file '{zip_file_name}' successfully!")
 
-def colorize_svg(svg_file, color):
-    with open(svg_file, 'r') as file:
-        svg_content = file.read()
-    colored_svg = re.sub(r'fill="[^"]+"', f'fill="{color}"', svg_content)
-    with open(svg_file, 'w') as file:
-        file.write(colored_svg)
+def colorize_svg(svg_file, color, background_color="#FFFFFF"):
+    """
+    Colorize SVG using proper XML manipulation with namespace handling.
+    
+    Args:
+        svg_file (str): Path to SVG file
+        color (str): Foreground color for QR code modules
+        background_color (str): Background color (default white)
+    """
+    try:
+        # Read the SVG file
+        with open(svg_file, 'r') as file:
+            svg_content = file.read()
+        
+        # Parse the SVG string with XML
+        try:
+            root = ET.fromstring(svg_content)
+        except ET.ParseError as e:
+            print(f"Warning: Could not parse SVG as XML ({e}), falling back to regex method")
+            # Fallback to original regex method if XML parsing fails
+            colored_svg = re.sub(r'fill="[^"]+"', f'fill="{color}"', svg_content)
+            with open(svg_file, 'w') as file:
+                file.write(colored_svg)
+            return
+        
+        # Register SVG namespace to handle namespace prefixes properly
+        ET.register_namespace('svg', 'http://www.w3.org/2000/svg')
+        namespace = "{http://www.w3.org/2000/svg}"
+        
+        # Track if we modified anything
+        modified = False
+        
+        # Find and color path elements (for path-based QR codes)
+        path_elements = root.findall(f".//{namespace}path")
+        if not path_elements:
+            path_elements = root.findall(".//path")  # Try without namespace
+        
+        for path_element in path_elements:
+            path_element.set("fill", color)
+            modified = True
+        
+        # Find and color rect elements (for rect-based QR codes like SvgFillImage)
+        rect_elements = root.findall(f".//{namespace}rect")
+        if not rect_elements:
+            rect_elements = root.findall(".//rect")  # Try without namespace
+        
+        # The first rect is usually the background, others are QR modules
+        for i, rect_element in enumerate(rect_elements):
+            if i == 0:
+                # First rect is typically the background
+                rect_element.set("fill", background_color)
+            else:
+                # Other rects are QR code modules
+                rect_element.set("fill", color)
+            modified = True
+        
+        if not modified:
+            print("Warning: Could not find path or rect elements in SVG. Falling back to regex method.")
+            # Fallback to regex if no elements found
+            colored_svg = re.sub(r'fill="[^"]+"', f'fill="{color}"', svg_content)
+            with open(svg_file, 'w') as file:
+                file.write(colored_svg)
+            return
+        
+        # Write the modified SVG back to file
+        modified_svg_string = ET.tostring(root, encoding='unicode')
+        
+        # Ensure proper SVG declaration if missing
+        if not modified_svg_string.startswith('<?xml'):
+            modified_svg_string = '<?xml version="1.0" encoding="UTF-8"?>\n' + modified_svg_string
+        
+        with open(svg_file, 'w') as file:
+            file.write(modified_svg_string)
+            
+    except Exception as e:
+        print(f"Warning: Error in XML-based SVG colorization ({e}), falling back to regex method")
+        # Fallback to original regex method if anything goes wrong
+        try:
+            with open(svg_file, 'r') as file:
+                svg_content = file.read()
+            colored_svg = re.sub(r'fill="[^"]+"', f'fill="{color}"', svg_content)
+            with open(svg_file, 'w') as file:
+                file.write(colored_svg)
+        except Exception as fallback_error:
+            print(f"Error: Both XML and regex colorization methods failed: {fallback_error}")
 
 def clean_output_folder(output_folder):
     for root, _, files in os.walk(output_folder):
