@@ -25,17 +25,19 @@ Base file: `generate_qr_codes_gui_loop.py`
 **Source**: `generate_qr_codes_gui.py:70-77`  
 **Status**: ✅ Enhanced create_qr_codes() with CSV mode, added full CSV workflow to main(), safe filename generation, comprehensive tests in `tests/test_csv_processing.py` and `tests/test_csv_manual.py`, sample CSV created in `input/test_urls.csv`
 
-### Task 4: Add column selection dialog
+### Task 4: Add column selection dialog ✅ COMPLETED
 **Start**: Add input dialog for column selection when CSV mode chosen  
 **End**: User can specify which CSV column contains QR code data  
 **Test**: Test with multi-column CSV, verify correct column data used  
-**Source**: `generate_qr_codes_gui.py:60`
+**Source**: `generate_qr_codes_gui.py:60`  
+**Status**: ✅ Already implemented via simpledialog.askinteger() on line 118, comprehensive tests created in `tests/test_column_selection.py`, supports multi-column CSV processing with invalid column handling
 
-### Task 5: Add skip header row option
+### Task 5: Add skip header row option ✅ COMPLETED
 **Start**: Add checkbox/dialog for skipping first CSV row  
 **End**: User can choose to skip header row in CSV processing  
 **Test**: Test with CSV having headers, verify first row skipped when selected  
-**Source**: `generate_qr_codes_gui.py:61,72`
+**Source**: `generate_qr_codes_gui.py:61,72`  
+**Status**: ✅ Already implemented via messagebox.askyesno() on line 119, tests created in `tests/test_header_skip.py`, properly skips header row when selected
 
 ## Advanced SVG Color Handling (from colored_qr_works.py)
 
