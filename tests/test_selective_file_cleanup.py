@@ -78,6 +78,7 @@ class TestSelectiveFileCleanup(unittest.TestCase):
         # Mock the GUI dialogs
         mock_tk.return_value.withdraw = MagicMock()
         mock_askyesno.side_effect = [
+            False,  # No presets
             True,   # CSV mode
             False,  # Skip first row
             False,  # No advanced QR parameters
@@ -123,6 +124,7 @@ class TestSelectiveFileCleanup(unittest.TestCase):
         # Mock the GUI dialogs
         mock_tk.return_value.withdraw = MagicMock()
         mock_askyesno.side_effect = [
+            False,  # No presets
             True,   # CSV mode
             False,  # Skip first row
             False,  # No advanced QR parameters
@@ -168,6 +170,7 @@ class TestSelectiveFileCleanup(unittest.TestCase):
         # Mock the GUI dialogs
         mock_tk.return_value.withdraw = MagicMock()
         mock_askyesno.side_effect = [
+            False,  # No presets
             True,   # CSV mode
             False,  # Skip first row
             False,  # No advanced QR parameters
@@ -210,6 +213,7 @@ class TestSelectiveFileCleanup(unittest.TestCase):
         # Mock the GUI dialogs
         mock_tk.return_value.withdraw = MagicMock()
         mock_askyesno.side_effect = [
+            False,  # No presets
             False,  # Manual mode (not CSV)
             False,  # No advanced QR parameters
             False,  # No filename customization
@@ -249,6 +253,7 @@ class TestSelectiveFileCleanup(unittest.TestCase):
         # Mock the GUI dialogs
         mock_tk.return_value.withdraw = MagicMock()
         mock_askyesno.side_effect = [
+            False,  # No presets
             False,  # Manual mode (not CSV)
             False,  # No advanced QR parameters
             False,  # No filename customization
@@ -288,6 +293,7 @@ class TestSelectiveFileCleanup(unittest.TestCase):
         # Mock the GUI dialogs
         mock_tk.return_value.withdraw = MagicMock()
         mock_askyesno.side_effect = [
+            False,  # No presets
             False,  # Manual mode (not CSV)
             False,  # No advanced QR parameters
             False,  # No filename customization

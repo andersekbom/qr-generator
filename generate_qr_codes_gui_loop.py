@@ -9,6 +9,7 @@ import re
 from tqdm import tqdm
 import xml.etree.ElementTree as ET
 from datetime import datetime
+import json
 
 import PIL
 from PIL import Image, ImageDraw
@@ -119,6 +120,122 @@ def get_error_correction_level(level_str):
         'H': qrcode.constants.ERROR_CORRECT_H
     }
     return levels.get(level_str.upper(), qrcode.constants.ERROR_CORRECT_L)
+
+def get_presets_dir():
+    """Get or create the presets directory"""
+    presets_dir = os.path.join(os.getcwd(), "presets")
+    os.makedirs(presets_dir, exist_ok=True)
+    return presets_dir
+
+def save_preset(preset_name, parameters):
+    """Save parameter preset to JSON file"""
+    try:
+        presets_dir = get_presets_dir()
+        preset_file = os.path.join(presets_dir, f"{preset_name}.json")
+        
+        with open(preset_file, 'w') as f:
+            json.dump(parameters, f, indent=2)
+        
+        return True, f"Preset '{preset_name}' saved successfully"
+    except Exception as e:
+        return False, f"Failed to save preset: {e}"
+
+def load_preset(preset_name):
+    """Load parameter preset from JSON file"""
+    try:
+        presets_dir = get_presets_dir()
+        preset_file = os.path.join(presets_dir, f"{preset_name}.json")
+        
+        if not os.path.exists(preset_file):
+            return False, f"Preset '{preset_name}' not found"
+        
+        with open(preset_file, 'r') as f:
+            parameters = json.load(f)
+        
+        return True, parameters
+    except Exception as e:
+        return False, f"Failed to load preset: {e}"
+
+def list_presets():
+    """List all available presets"""
+    try:
+        presets_dir = get_presets_dir()
+        preset_files = [f for f in os.listdir(presets_dir) if f.endswith('.json')]
+        preset_names = [os.path.splitext(f)[0] for f in preset_files]
+        return preset_names
+    except Exception:
+        return []
+
+def delete_preset(preset_name):
+    """Delete a parameter preset"""
+    try:
+        presets_dir = get_presets_dir()
+        preset_file = os.path.join(presets_dir, f"{preset_name}.json")
+        
+        if not os.path.exists(preset_file):
+            return False, f"Preset '{preset_name}' not found"
+        
+        os.remove(preset_file)
+        return True, f"Preset '{preset_name}' deleted successfully"
+    except Exception as e:
+        return False, f"Failed to delete preset: {e}"
+
+def create_manual_mode_preset(valid_uses, volume, end_date, color, format, security_code, suffix_code, qr_version=None, error_correction="L", box_size=10, border=4, filename_prefix="", filename_suffix="", use_payload_as_filename=True):
+    """Create preset dictionary for manual mode parameters"""
+    return {
+        "mode": "manual",
+        "valid_uses": valid_uses,
+        "volume": volume,
+        "end_date": end_date,
+        "color": color,
+        "format": format,
+        "security_code": security_code,
+        "suffix_code": suffix_code,
+        "qr_version": qr_version,
+        "error_correction": error_correction,
+        "box_size": box_size,
+        "border": border,
+        "filename_prefix": filename_prefix,
+        "filename_suffix": filename_suffix,
+        "use_payload_as_filename": use_payload_as_filename
+    }
+
+def create_csv_mode_preset(format, color, qr_version=None, error_correction="L", box_size=10, border=4, filename_prefix="", filename_suffix="", use_payload_as_filename=True, delimiter=",", input_column=0, skip_first_row=False):
+    """Create preset dictionary for CSV mode parameters"""
+    return {
+        "mode": "csv",
+        "format": format,
+        "color": color,
+        "qr_version": qr_version,
+        "error_correction": error_correction,
+        "box_size": box_size,
+        "border": border,
+        "filename_prefix": filename_prefix,
+        "filename_suffix": filename_suffix,
+        "use_payload_as_filename": use_payload_as_filename,
+        "delimiter": delimiter,
+        "input_column": input_column,
+        "skip_first_row": skip_first_row
+    }
+
+def show_preset_menu():
+    """Show preset management menu and return user choice"""
+    available_presets = list_presets()
+    preset_list = "\n".join([f"- {name}" for name in available_presets]) if available_presets else "No presets available"
+    
+    menu_text = f"""Preset Management:
+
+Available presets:
+{preset_list}
+
+Choose action:
+1. Load preset
+2. Save current parameters as preset
+3. Delete preset
+4. Continue without presets"""
+    
+    choice = simpledialog.askstring("Preset Management", menu_text + "\n\nEnter choice (1-4):")
+    return choice, available_presets
 
 def generate_custom_filename(base_name, prefix="", suffix="", use_payload_as_base=True, index=None):
     """Generate custom filename with optional prefix/suffix"""
@@ -327,8 +444,39 @@ def main():
     root = tk.Tk()
     root.withdraw()  # Hide the root window
 
-    # Ask user to choose input mode
-    input_mode = messagebox.askyesno("Input Mode", "Use CSV file for input?\n\nYes = CSV file input\nNo = Manual parameter input")
+    # Check if user wants to use presets
+    use_presets = messagebox.askyesno("Presets", "Use parameter presets?\n\nYes = Manage presets\nNo = Enter parameters manually")
+    
+    loaded_preset = None
+    if use_presets:
+        choice, available_presets = show_preset_menu()
+        
+        if choice == "1" and available_presets:  # Load preset
+            preset_name = simpledialog.askstring("Load Preset", f"Available presets: {', '.join(available_presets)}\n\nEnter preset name to load:")
+            if preset_name:
+                success, result = load_preset(preset_name)
+                if success:
+                    loaded_preset = result
+                    messagebox.showinfo("Success", f"Preset '{preset_name}' loaded successfully!")
+                else:
+                    messagebox.showerror("Error", result)
+                    return
+        elif choice == "3" and available_presets:  # Delete preset
+            preset_name = simpledialog.askstring("Delete Preset", f"Available presets: {', '.join(available_presets)}\n\nEnter preset name to delete:")
+            if preset_name:
+                success, result = delete_preset(preset_name)
+                if success:
+                    messagebox.showinfo("Success", result)
+                else:
+                    messagebox.showerror("Error", result)
+                return
+        # For choice "4" or "2", continue to parameter input
+
+    # Ask user to choose input mode (or use preset mode)
+    if loaded_preset:
+        input_mode = loaded_preset["mode"] == "csv"
+    else:
+        input_mode = messagebox.askyesno("Input Mode", "Use CSV file for input?\n\nYes = CSV file input\nNo = Manual parameter input")
     
     if input_mode:
         # CSV mode - get file and process it
@@ -339,72 +487,95 @@ def main():
         
         # Process CSV file
         try:
-            detected_delimiter = detect_delimiter(input_file)
-            delimiter = simpledialog.askstring("Input", f"Enter separator [{detected_delimiter}]:") or detected_delimiter
-            input_column = simpledialog.askinteger("Input", "Enter 0-indexed input column [0]:", initialvalue=0)
-            skip_first_row = messagebox.askyesno("Input", "Skip first row?")
-            
-            # Validate format
-            format_input = simpledialog.askstring("Input", "Image format [png,svg]:", initialvalue="png")
-            format_valid, format_result = validate_format(format_input)
-            if not format_valid:
-                messagebox.showerror("Validation Error", format_result)
-                return
-            format = format_result
-            
-            # Validate color
-            color_input = simpledialog.askstring("Input", "Image color [hex or name]:", initialvalue="#000000")
-            color_valid, color_result = validate_color_format(color_input)
-            if not color_valid:
-                messagebox.showerror("Validation Error", color_result)
-                return
-            color = color_result
-            
-            # Ask for advanced QR code parameters
-            advanced_qr = messagebox.askyesno("QR Parameters", "Configure advanced QR code parameters?")
-            qr_version, error_correction, box_size, border = None, "L", 10, 4
-            
-            if advanced_qr:
-                # QR Version
-                version_input = simpledialog.askstring("QR Parameters", "QR version (1-40 or 'auto'):", initialvalue="auto")
-                version_valid, version_result = validate_qr_version(version_input)
-                if not version_valid:
-                    messagebox.showerror("Validation Error", version_result)
-                    return
-                qr_version = version_result
+            # Use preset values or ask user for input
+            if loaded_preset and loaded_preset["mode"] == "csv":
+                delimiter = loaded_preset.get("delimiter", ",")
+                input_column = loaded_preset.get("input_column", 0)
+                skip_first_row = loaded_preset.get("skip_first_row", False)
+                format = loaded_preset.get("format", "png")
+                color = loaded_preset.get("color", "#000000")
                 
-                # Error correction
-                error_input = simpledialog.askstring("QR Parameters", "Error correction level (L/M/Q/H):", initialvalue="L")
-                error_valid, error_result = validate_error_correction(error_input)
-                if not error_valid:
-                    messagebox.showerror("Validation Error", error_result)
+                # Show loaded values to user for confirmation
+                preset_info = f"Using preset values:\nDelimiter: {delimiter}\nColumn: {input_column}\nSkip first row: {skip_first_row}\nFormat: {format}\nColor: {color}"
+                if not messagebox.askyesno("Preset Values", f"{preset_info}\n\nContinue with these values?"):
                     return
-                error_correction = error_result
+            else:
+                detected_delimiter = detect_delimiter(input_file)
+                delimiter = simpledialog.askstring("Input", f"Enter separator [{detected_delimiter}]:") or detected_delimiter
+                input_column = simpledialog.askinteger("Input", "Enter 0-indexed input column [0]:", initialvalue=0)
+                skip_first_row = messagebox.askyesno("Input", "Skip first row?")
                 
-                # Box size
-                box_size_input = simpledialog.askstring("QR Parameters", "Box size (pixels per module):", initialvalue="10")
-                box_size_valid, box_size_result = validate_integer_input(box_size_input, "Box size", 1, 50)
-                if not box_size_valid:
-                    messagebox.showerror("Validation Error", box_size_result)
+                # Validate format
+                format_input = simpledialog.askstring("Input", "Image format [png,svg]:", initialvalue="png")
+                format_valid, format_result = validate_format(format_input)
+                if not format_valid:
+                    messagebox.showerror("Validation Error", format_result)
                     return
-                box_size = box_size_result
+                format = format_result
                 
-                # Border
-                border_input = simpledialog.askstring("QR Parameters", "Border size (modules):", initialvalue="4")
-                border_valid, border_result = validate_integer_input(border_input, "Border", 0, 20)
-                if not border_valid:
-                    messagebox.showerror("Validation Error", border_result)
+                # Validate color
+                color_input = simpledialog.askstring("Input", "Image color [hex or name]:", initialvalue="#000000")
+                color_valid, color_result = validate_color_format(color_input)
+                if not color_valid:
+                    messagebox.showerror("Validation Error", color_result)
                     return
-                border = border_result
+                color = color_result
             
-            # Ask for filename customization options
-            customize_filenames = messagebox.askyesno("Filename Options", "Customize filename format?")
-            filename_prefix, filename_suffix, use_payload_as_filename = "", "", True
-            
-            if customize_filenames:
-                filename_prefix = simpledialog.askstring("Filename Options", "Enter filename prefix (optional):") or ""
-                filename_suffix = simpledialog.askstring("Filename Options", "Enter filename suffix (optional):") or ""
-                use_payload_as_filename = messagebox.askyesno("Filename Options", "Use CSV data as filename base?\n\nYes = Use data content\nNo = Use qr_code_1, qr_code_2, etc.")
+            # Use preset values for advanced QR parameters or ask user
+            if loaded_preset and loaded_preset["mode"] == "csv":
+                qr_version = loaded_preset.get("qr_version", None)
+                error_correction = loaded_preset.get("error_correction", "L")
+                box_size = loaded_preset.get("box_size", 10)
+                border = loaded_preset.get("border", 4)
+                filename_prefix = loaded_preset.get("filename_prefix", "")
+                filename_suffix = loaded_preset.get("filename_suffix", "")
+                use_payload_as_filename = loaded_preset.get("use_payload_as_filename", True)
+            else:
+                # Ask for advanced QR code parameters
+                advanced_qr = messagebox.askyesno("QR Parameters", "Configure advanced QR code parameters?")
+                qr_version, error_correction, box_size, border = None, "L", 10, 4
+                
+                if advanced_qr:
+                    # QR Version
+                    version_input = simpledialog.askstring("QR Parameters", "QR version (1-40 or 'auto'):", initialvalue="auto")
+                    version_valid, version_result = validate_qr_version(version_input)
+                    if not version_valid:
+                        messagebox.showerror("Validation Error", version_result)
+                        return
+                    qr_version = version_result
+                    
+                    # Error correction
+                    error_input = simpledialog.askstring("QR Parameters", "Error correction level (L/M/Q/H):", initialvalue="L")
+                    error_valid, error_result = validate_error_correction(error_input)
+                    if not error_valid:
+                        messagebox.showerror("Validation Error", error_result)
+                        return
+                    error_correction = error_result
+                    
+                    # Box size
+                    box_size_input = simpledialog.askstring("QR Parameters", "Box size (pixels per module):", initialvalue="10")
+                    box_size_valid, box_size_result = validate_integer_input(box_size_input, "Box size", 1, 50)
+                    if not box_size_valid:
+                        messagebox.showerror("Validation Error", box_size_result)
+                        return
+                    box_size = box_size_result
+                    
+                    # Border
+                    border_input = simpledialog.askstring("QR Parameters", "Border size (modules):", initialvalue="4")
+                    border_valid, border_result = validate_integer_input(border_input, "Border", 0, 20)
+                    if not border_valid:
+                        messagebox.showerror("Validation Error", border_result)
+                        return
+                    border = border_result
+                
+                # Ask for filename customization options
+                customize_filenames = messagebox.askyesno("Filename Options", "Customize filename format?")
+                filename_prefix, filename_suffix, use_payload_as_filename = "", "", True
+                
+                if customize_filenames:
+                    filename_prefix = simpledialog.askstring("Filename Options", "Enter filename prefix (optional):") or ""
+                    filename_suffix = simpledialog.askstring("Filename Options", "Enter filename suffix (optional):") or ""
+                    use_payload_as_filename = messagebox.askyesno("Filename Options", "Use CSV data as filename base?\n\nYes = Use data content\nNo = Use qr_code_1, qr_code_2, etc.")
             
             # Read CSV data
             with open(input_file, "r") as infile:
@@ -432,6 +603,21 @@ def main():
             zip_file_name = None
             if zip_output:
                 zip_file_name = simpledialog.askstring("Input", f"Enter zip file name [output_{format}.zip]:", initialvalue=f"output_{format}.zip")
+            
+            # Ask if user wants to save current parameters as preset (only if not using existing preset)
+            if not loaded_preset and use_presets and choice == "2":
+                preset_name = simpledialog.askstring("Save Preset", "Enter name for this preset:")
+                if preset_name:
+                    preset_params = create_csv_mode_preset(
+                        format, color, qr_version, error_correction, box_size, border,
+                        filename_prefix, filename_suffix, use_payload_as_filename,
+                        delimiter, input_column, skip_first_row
+                    )
+                    success, result = save_preset(preset_name, preset_params)
+                    if success:
+                        messagebox.showinfo("Success", result)
+                    else:
+                        messagebox.showerror("Error", result)
             
             # For CSV mode, we don't use the sequential payload format, so we skip security_code and suffix_code
             # Generate QR codes from CSV data
@@ -461,59 +647,85 @@ def main():
             return
     
     # Manual parameter input mode
-    # Validate valid_uses
-    valid_uses_input = simpledialog.askstring("Input", "Enter Valid uses (e.g. 15):")
-    if not valid_uses_input:
-        messagebox.showerror("Error", "No valid uses entered. Exiting.")
-        return
-    
-    valid_uses_valid, valid_uses_result = validate_integer_input(valid_uses_input, "Valid uses", 1, 9999)
-    if not valid_uses_valid:
-        messagebox.showerror("Validation Error", valid_uses_result)
-        return
-    valid_uses = str(valid_uses_result)
+    # Use preset values or ask user for input
+    if loaded_preset and loaded_preset["mode"] == "manual":
+        valid_uses = loaded_preset.get("valid_uses", "15")
+        volume = loaded_preset.get("volume", "500")
+        end_date = loaded_preset.get("end_date", "26.12.31")
+        color = loaded_preset.get("color", "#000000")
+        format = loaded_preset.get("format", "png")
+        security_code = loaded_preset.get("security_code", "SECD")
+        suffix_code = loaded_preset.get("suffix_code", "23FF45EE")
+        
+        # Show loaded values to user for confirmation
+        preset_info = f"Using preset values:\nValid uses: {valid_uses}\nVolume: {volume}\nEnd date: {end_date}\nColor: {color}\nFormat: {format}\nSecurity code: {security_code}\nSuffix code: {suffix_code}"
+        if not messagebox.askyesno("Preset Values", f"{preset_info}\n\nContinue with these values?"):
+            return
+    else:
+        # Validate valid_uses
+        valid_uses_input = simpledialog.askstring("Input", "Enter Valid uses (e.g. 15):")
+        if not valid_uses_input:
+            messagebox.showerror("Error", "No valid uses entered. Exiting.")
+            return
+        
+        valid_uses_valid, valid_uses_result = validate_integer_input(valid_uses_input, "Valid uses", 1, 9999)
+        if not valid_uses_valid:
+            messagebox.showerror("Validation Error", valid_uses_result)
+            return
+        valid_uses = str(valid_uses_result)
 
-    # Validate volume
-    volume_input = simpledialog.askstring("Input", "Enter Volume (e.g. 500):")
-    if not volume_input:
-        messagebox.showerror("Error", "No volume entered. Exiting.")
-        return
-    
-    volume_valid, volume_result = validate_integer_input(volume_input, "Volume", 1, 99999)
-    if not volume_valid:
-        messagebox.showerror("Validation Error", volume_result)
-        return
-    volume = str(volume_result)
+        # Validate volume
+        volume_input = simpledialog.askstring("Input", "Enter Volume (e.g. 500):")
+        if not volume_input:
+            messagebox.showerror("Error", "No volume entered. Exiting.")
+            return
+        
+        volume_valid, volume_result = validate_integer_input(volume_input, "Volume", 1, 99999)
+        if not volume_valid:
+            messagebox.showerror("Validation Error", volume_result)
+            return
+        volume = str(volume_result)
 
-    # Validate end_date
-    end_date_input = simpledialog.askstring("Input", "Enter Valid Until date:", initialvalue="26.12.31")
-    if not end_date_input:
-        messagebox.showerror("Error", "No end date entered. Exiting.")
-        return
-    
-    date_valid, date_result = validate_date_format(end_date_input)
-    if not date_valid:
-        messagebox.showerror("Validation Error", date_result)
-        return
-    end_date = date_result
+        # Validate end_date
+        end_date_input = simpledialog.askstring("Input", "Enter Valid Until date:", initialvalue="26.12.31")
+        if not end_date_input:
+            messagebox.showerror("Error", "No end date entered. Exiting.")
+            return
+        
+        date_valid, date_result = validate_date_format(end_date_input)
+        if not date_valid:
+            messagebox.showerror("Validation Error", date_result)
+            return
+        end_date = date_result
 
-    # Validate color
-    color_input = simpledialog.askstring("Input", "Image color [hex or name]:", initialvalue="#000000")
-    color_valid, color_result = validate_color_format(color_input)
-    if not color_valid:
-        messagebox.showerror("Validation Error", color_result)
-        return
-    color = color_result
+        # Validate color
+        color_input = simpledialog.askstring("Input", "Image color [hex or name]:", initialvalue="#000000")
+        color_valid, color_result = validate_color_format(color_input)
+        if not color_valid:
+            messagebox.showerror("Validation Error", color_result)
+            return
+        color = color_result
+        
+        # Validate format
+        format_input = simpledialog.askstring("Input", "Image format [png,svg]:", initialvalue="png")
+        format_valid, format_result = validate_format(format_input)
+        if not format_valid:
+            messagebox.showerror("Validation Error", format_result)
+            return
+        format = format_result
+        
+        # Ask for payload customization options
+        security_code = simpledialog.askstring("Input", "Enter security code:", initialvalue="SECD")
+        if not security_code:
+            messagebox.showerror("Error", "No security code entered. Exiting.")
+            return
+        
+        suffix_code = simpledialog.askstring("Input", "Enter suffix code:", initialvalue="23FF45EE")
+        if not suffix_code:
+            messagebox.showerror("Error", "No suffix code entered. Exiting.")
+            return
     
-    # Validate format
-    format_input = simpledialog.askstring("Input", "Image format [png,svg]:", initialvalue="png")
-    format_valid, format_result = validate_format(format_input)
-    if not format_valid:
-        messagebox.showerror("Validation Error", format_result)
-        return
-    format = format_result
-    
-    # Validate count
+    # Validate count (always ask this even with presets since it's generation specific)
     count = simpledialog.askinteger("Input", "How many QR codes to generate?", initialvalue=1)
     if not count:
         messagebox.showerror("Error", "No count entered. Exiting.")
@@ -525,62 +737,61 @@ def main():
         return
     count = count_result
 
-    # Ask for payload customization options
-    security_code = simpledialog.askstring("Input", "Enter security code:", initialvalue="SECD")
-    if not security_code:
-        messagebox.showerror("Error", "No security code entered. Exiting.")
-        return
-    
-    suffix_code = simpledialog.askstring("Input", "Enter suffix code:", initialvalue="23FF45EE")
-    if not suffix_code:
-        messagebox.showerror("Error", "No suffix code entered. Exiting.")
-        return
+    # Use preset values for advanced QR parameters or ask user
+    if loaded_preset and loaded_preset["mode"] == "manual":
+        qr_version = loaded_preset.get("qr_version", None)
+        error_correction = loaded_preset.get("error_correction", "L")
+        box_size = loaded_preset.get("box_size", 10)
+        border = loaded_preset.get("border", 4)
+        filename_prefix = loaded_preset.get("filename_prefix", "")
+        filename_suffix = loaded_preset.get("filename_suffix", "")
+        use_payload_as_filename = loaded_preset.get("use_payload_as_filename", True)
+    else:
+        # Ask for advanced QR code parameters
+        advanced_qr = messagebox.askyesno("QR Parameters", "Configure advanced QR code parameters?")
+        qr_version, error_correction, box_size, border = None, "L", 10, 4
+        
+        if advanced_qr:
+            # QR Version
+            version_input = simpledialog.askstring("QR Parameters", "QR version (1-40 or 'auto'):", initialvalue="auto")
+            version_valid, version_result = validate_qr_version(version_input)
+            if not version_valid:
+                messagebox.showerror("Validation Error", version_result)
+                return
+            qr_version = version_result
+            
+            # Error correction
+            error_input = simpledialog.askstring("QR Parameters", "Error correction level (L/M/Q/H):", initialvalue="L")
+            error_valid, error_result = validate_error_correction(error_input)
+            if not error_valid:
+                messagebox.showerror("Validation Error", error_result)
+                return
+            error_correction = error_result
+            
+            # Box size
+            box_size_input = simpledialog.askstring("QR Parameters", "Box size (pixels per module):", initialvalue="10")
+            box_size_valid, box_size_result = validate_integer_input(box_size_input, "Box size", 1, 50)
+            if not box_size_valid:
+                messagebox.showerror("Validation Error", box_size_result)
+                return
+            box_size = box_size_result
+            
+            # Border
+            border_input = simpledialog.askstring("QR Parameters", "Border size (modules):", initialvalue="4")
+            border_valid, border_result = validate_integer_input(border_input, "Border", 0, 20)
+            if not border_valid:
+                messagebox.showerror("Validation Error", border_result)
+                return
+            border = border_result
 
-    # Ask for advanced QR code parameters
-    advanced_qr = messagebox.askyesno("QR Parameters", "Configure advanced QR code parameters?")
-    qr_version, error_correction, box_size, border = None, "L", 10, 4
-    
-    if advanced_qr:
-        # QR Version
-        version_input = simpledialog.askstring("QR Parameters", "QR version (1-40 or 'auto'):", initialvalue="auto")
-        version_valid, version_result = validate_qr_version(version_input)
-        if not version_valid:
-            messagebox.showerror("Validation Error", version_result)
-            return
-        qr_version = version_result
+        # Ask for filename customization options
+        customize_filenames = messagebox.askyesno("Filename Options", "Customize filename format?")
+        filename_prefix, filename_suffix, use_payload_as_filename = "", "", True
         
-        # Error correction
-        error_input = simpledialog.askstring("QR Parameters", "Error correction level (L/M/Q/H):", initialvalue="L")
-        error_valid, error_result = validate_error_correction(error_input)
-        if not error_valid:
-            messagebox.showerror("Validation Error", error_result)
-            return
-        error_correction = error_result
-        
-        # Box size
-        box_size_input = simpledialog.askstring("QR Parameters", "Box size (pixels per module):", initialvalue="10")
-        box_size_valid, box_size_result = validate_integer_input(box_size_input, "Box size", 1, 50)
-        if not box_size_valid:
-            messagebox.showerror("Validation Error", box_size_result)
-            return
-        box_size = box_size_result
-        
-        # Border
-        border_input = simpledialog.askstring("QR Parameters", "Border size (modules):", initialvalue="4")
-        border_valid, border_result = validate_integer_input(border_input, "Border", 0, 20)
-        if not border_valid:
-            messagebox.showerror("Validation Error", border_result)
-            return
-        border = border_result
-
-    # Ask for filename customization options
-    customize_filenames = messagebox.askyesno("Filename Options", "Customize filename format?")
-    filename_prefix, filename_suffix, use_payload_as_filename = "", "", True
-    
-    if customize_filenames:
-        filename_prefix = simpledialog.askstring("Filename Options", "Enter filename prefix (optional):") or ""
-        filename_suffix = simpledialog.askstring("Filename Options", "Enter filename suffix (optional):") or ""
-        use_payload_as_filename = messagebox.askyesno("Filename Options", "Use payload as filename base?\n\nYes = Use M-15-00000001-500-26.12.31-SECD-23FF45EE\nNo = Use qr_code_1, qr_code_2, etc.")
+        if customize_filenames:
+            filename_prefix = simpledialog.askstring("Filename Options", "Enter filename prefix (optional):") or ""
+            filename_suffix = simpledialog.askstring("Filename Options", "Enter filename suffix (optional):") or ""
+            use_payload_as_filename = messagebox.askyesno("Filename Options", "Use payload as filename base?\n\nYes = Use M-15-00000001-500-26.12.31-SECD-23FF45EE\nNo = Use qr_code_1, qr_code_2, etc.")
 
     # Output directory selection
     use_custom_output = messagebox.askyesno("Output Directory", "Choose custom output directory?\n\nYes = Select directory\nNo = Use default 'output' folder")
@@ -597,6 +808,21 @@ def main():
     zip_file_name = None
     if zip_output:
         zip_file_name = simpledialog.askstring("Input", f"Enter zip file name:", initialvalue=f"QR-{valid_uses}-{volume}-{color}-{count}-{format}.zip")
+
+    # Ask if user wants to save current parameters as preset (only if not using existing preset)
+    if not loaded_preset and use_presets and choice == "2":
+        preset_name = simpledialog.askstring("Save Preset", "Enter name for this preset:")
+        if preset_name:
+            preset_params = create_manual_mode_preset(
+                valid_uses, volume, end_date, color, format, security_code, suffix_code,
+                qr_version, error_correction, box_size, border,
+                filename_prefix, filename_suffix, use_payload_as_filename
+            )
+            success, result = save_preset(preset_name, preset_params)
+            if success:
+                messagebox.showinfo("Success", result)
+            else:
+                messagebox.showerror("Error", result)
 
     try:
         create_qr_codes(valid_uses, volume, end_date, color, output_folder, format, count, security_code=security_code, suffix_code=suffix_code, qr_version=qr_version, error_correction=error_correction, box_size=box_size, border=border, filename_prefix=filename_prefix, filename_suffix=filename_suffix, use_payload_as_filename=use_payload_as_filename)
