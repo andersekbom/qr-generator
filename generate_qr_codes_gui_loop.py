@@ -111,6 +111,32 @@ def validate_error_correction(level_str):
     
     return True, level_str.upper()
 
+def validate_png_quality(quality_str):
+    """Validate PNG quality setting"""
+    if not quality_str:
+        return False, "PNG quality cannot be empty"
+    
+    try:
+        quality = int(quality_str)
+        if quality < 0 or quality > 100:
+            return False, "PNG quality must be between 0 and 100"
+        return True, quality
+    except ValueError:
+        return False, "PNG quality must be a valid number"
+
+def validate_svg_precision(precision_str):
+    """Validate SVG precision setting"""
+    if not precision_str:
+        return False, "SVG precision cannot be empty"
+    
+    try:
+        precision = int(precision_str)
+        if precision < 0 or precision > 10:
+            return False, "SVG precision must be between 0 and 10"
+        return True, precision
+    except ValueError:
+        return False, "SVG precision must be a valid number"
+
 def get_error_correction_level(level_str):
     """Convert error correction string to qrcode constant"""
     levels = {
@@ -180,7 +206,7 @@ def delete_preset(preset_name):
     except Exception as e:
         return False, f"Failed to delete preset: {e}"
 
-def create_manual_mode_preset(valid_uses, volume, end_date, color, format, security_code, suffix_code, qr_version=None, error_correction="L", box_size=10, border=4, filename_prefix="", filename_suffix="", use_payload_as_filename=True):
+def create_manual_mode_preset(valid_uses, volume, end_date, color, format, security_code, suffix_code, qr_version=None, error_correction="L", box_size=10, border=4, filename_prefix="", filename_suffix="", use_payload_as_filename=True, png_quality=85, svg_precision=2):
     """Create preset dictionary for manual mode parameters"""
     return {
         "mode": "manual",
@@ -197,10 +223,12 @@ def create_manual_mode_preset(valid_uses, volume, end_date, color, format, secur
         "border": border,
         "filename_prefix": filename_prefix,
         "filename_suffix": filename_suffix,
-        "use_payload_as_filename": use_payload_as_filename
+        "use_payload_as_filename": use_payload_as_filename,
+        "png_quality": png_quality,
+        "svg_precision": svg_precision
     }
 
-def create_csv_mode_preset(format, color, qr_version=None, error_correction="L", box_size=10, border=4, filename_prefix="", filename_suffix="", use_payload_as_filename=True, delimiter=",", input_column=0, skip_first_row=False):
+def create_csv_mode_preset(format, color, qr_version=None, error_correction="L", box_size=10, border=4, filename_prefix="", filename_suffix="", use_payload_as_filename=True, delimiter=",", input_column=0, skip_first_row=False, png_quality=85, svg_precision=2):
     """Create preset dictionary for CSV mode parameters"""
     return {
         "mode": "csv",
@@ -215,7 +243,9 @@ def create_csv_mode_preset(format, color, qr_version=None, error_correction="L",
         "use_payload_as_filename": use_payload_as_filename,
         "delimiter": delimiter,
         "input_column": input_column,
-        "skip_first_row": skip_first_row
+        "skip_first_row": skip_first_row,
+        "png_quality": png_quality,
+        "svg_precision": svg_precision
     }
 
 def show_preset_menu():
@@ -263,7 +293,7 @@ def detect_delimiter(file_path):
         sample = infile.read(1024)
         return csv.Sniffer().sniff(sample).delimiter
 
-def create_qr_codes(valid_uses, volume, end_date, color, output_folder, format, count, csv_data=None, input_column=0, security_code="SECD", suffix_code="23FF45EE", qr_version=None, error_correction="L", box_size=10, border=4, filename_prefix="", filename_suffix="", use_payload_as_filename=True):
+def create_qr_codes(valid_uses, volume, end_date, color, output_folder, format, count, csv_data=None, input_column=0, security_code="SECD", suffix_code="23FF45EE", qr_version=None, error_correction="L", box_size=10, border=4, filename_prefix="", filename_suffix="", use_payload_as_filename=True, png_quality=85, svg_precision=2):
     """
     Create QR codes either from manual parameters or CSV data
     
@@ -279,6 +309,8 @@ def create_qr_codes(valid_uses, volume, end_date, color, output_folder, format, 
         filename_prefix: Prefix to add to generated filenames
         filename_suffix: Suffix to add to generated filenames (before extension)
         use_payload_as_filename: Whether to use payload content as filename base
+        png_quality: Quality setting for PNG images (0-100, higher is better quality)
+        svg_precision: Decimal precision for SVG coordinates
         Other parameters: Used for manual mode or as defaults
     """
     os.makedirs(output_folder, exist_ok=True)
@@ -312,9 +344,15 @@ def create_qr_codes(valid_uses, volume, end_date, color, output_folder, format, 
                 use_payload_as_filename, i+1
             )
             filename = os.path.join(output_folder, f"{custom_filename}.{format}")
-            img.save(filename)
-            if format == 'svg':
-                colorize_svg(filename, color)
+            
+            if format == 'png':
+                # Apply PNG quality settings
+                img.save(filename, "PNG", optimize=True, quality=png_quality)
+            elif format == 'svg':
+                img.save(filename)
+                colorize_svg(filename, color, svg_precision=svg_precision)
+            else:
+                img.save(filename)
     else:
         # Manual mode: generate QR codes with sequential serials
         for i in tqdm(range(1, count + 1), desc="Generating QR codes"):
@@ -337,9 +375,15 @@ def create_qr_codes(valid_uses, volume, end_date, color, output_folder, format, 
                 use_payload_as_filename, i
             )
             filename = os.path.join(output_folder, f"{custom_filename}.{format}")
-            img.save(filename)
-            if format == 'svg':
-                colorize_svg(filename, color)
+            
+            if format == 'png':
+                # Apply PNG quality settings
+                img.save(filename, "PNG", optimize=True, quality=png_quality)
+            elif format == 'svg':
+                img.save(filename)
+                colorize_svg(filename, color, svg_precision=svg_precision)
+            else:
+                img.save(filename)
 
 def zip_output_files(output_folder, zip_file_name, format):
     with zipfile.ZipFile(zip_file_name, 'w', zipfile.ZIP_DEFLATED) as zipf:
@@ -349,7 +393,7 @@ def zip_output_files(output_folder, zip_file_name, format):
                     zipf.write(os.path.join(root, file), arcname=file)
     #messagebox.showinfo("Success", f"Output files added to zip file '{zip_file_name}' successfully!")
 
-def colorize_svg(svg_file, color, background_color="#FFFFFF"):
+def colorize_svg(svg_file, color, background_color="#FFFFFF", svg_precision=2):
     """
     Colorize SVG using proper XML manipulation with namespace handling.
     
@@ -357,6 +401,7 @@ def colorize_svg(svg_file, color, background_color="#FFFFFF"):
         svg_file (str): Path to SVG file
         color (str): Foreground color for QR code modules
         background_color (str): Background color (default white)
+        svg_precision (int): Decimal precision for SVG coordinates
     """
     try:
         # Read the SVG file
@@ -415,6 +460,17 @@ def colorize_svg(svg_file, color, background_color="#FFFFFF"):
         
         # Write the modified SVG back to file
         modified_svg_string = ET.tostring(root, encoding='unicode')
+        
+        # Apply precision formatting to numeric values in SVG
+        if svg_precision < 10:  # Only apply precision formatting if it's reasonable
+            import re
+            # Format decimal numbers to specified precision
+            def format_number(match):
+                number = float(match.group())
+                return f"{number:.{svg_precision}f}"
+            
+            # Match decimal numbers (including integers that could be formatted)
+            modified_svg_string = re.sub(r'\b\d+\.\d+\b', format_number, modified_svg_string)
         
         # Ensure proper SVG declaration if missing
         if not modified_svg_string.startswith('<?xml'):
@@ -536,10 +592,13 @@ def main():
                 filename_prefix = loaded_preset.get("filename_prefix", "")
                 filename_suffix = loaded_preset.get("filename_suffix", "")
                 use_payload_as_filename = loaded_preset.get("use_payload_as_filename", True)
+                png_quality = loaded_preset.get("png_quality", 85)
+                svg_precision = loaded_preset.get("svg_precision", 2)
             else:
                 # Ask for advanced QR code parameters
                 advanced_qr = messagebox.askyesno("QR Parameters", "Configure advanced QR code parameters?")
                 qr_version, error_correction, box_size, border = None, "L", 10, 4
+                png_quality, svg_precision = 85, 2
                 
                 if advanced_qr:
                     # QR Version
@@ -573,6 +632,22 @@ def main():
                         messagebox.showerror("Validation Error", border_result)
                         return
                     border = border_result
+                    
+                    # Format-specific options
+                    if format == 'png':
+                        quality_input = simpledialog.askstring("PNG Options", "PNG quality (0-100, higher is better):", initialvalue="85")
+                        quality_valid, quality_result = validate_png_quality(quality_input)
+                        if not quality_valid:
+                            messagebox.showerror("Validation Error", quality_result)
+                            return
+                        png_quality = quality_result
+                    elif format == 'svg':
+                        precision_input = simpledialog.askstring("SVG Options", "SVG precision (decimal places 0-10):", initialvalue="2")
+                        precision_valid, precision_result = validate_svg_precision(precision_input)
+                        if not precision_valid:
+                            messagebox.showerror("Validation Error", precision_result)
+                            return
+                        svg_precision = precision_result
                 
                 # Ask for filename customization options
                 customize_filenames = messagebox.askyesno("Filename Options", "Customize filename format?")
@@ -617,7 +692,7 @@ def main():
                     preset_params = create_csv_mode_preset(
                         format, color, qr_version, error_correction, box_size, border,
                         filename_prefix, filename_suffix, use_payload_as_filename,
-                        delimiter, input_column, skip_first_row
+                        delimiter, input_column, skip_first_row, png_quality, svg_precision
                     )
                     success, result = save_preset(preset_name, preset_params)
                     if success:
@@ -627,7 +702,7 @@ def main():
             
             # For CSV mode, we don't use the sequential payload format, so we skip security_code and suffix_code
             # Generate QR codes from CSV data
-            create_qr_codes(None, None, None, color, output_folder, format, None, csv_data=rows, input_column=input_column, qr_version=qr_version, error_correction=error_correction, box_size=box_size, border=border, filename_prefix=filename_prefix, filename_suffix=filename_suffix, use_payload_as_filename=use_payload_as_filename)
+            create_qr_codes(None, None, None, color, output_folder, format, None, csv_data=rows, input_column=input_column, qr_version=qr_version, error_correction=error_correction, box_size=box_size, border=border, filename_prefix=filename_prefix, filename_suffix=filename_suffix, use_payload_as_filename=use_payload_as_filename, png_quality=png_quality, svg_precision=svg_precision)
             
             messagebox.showinfo("Success", f"{len(rows)} QR codes generated successfully from CSV!")
             
@@ -768,10 +843,13 @@ def main():
         filename_prefix = loaded_preset.get("filename_prefix", "")
         filename_suffix = loaded_preset.get("filename_suffix", "")
         use_payload_as_filename = loaded_preset.get("use_payload_as_filename", True)
+        png_quality = loaded_preset.get("png_quality", 85)
+        svg_precision = loaded_preset.get("svg_precision", 2)
     else:
         # Ask for advanced QR code parameters
         advanced_qr = messagebox.askyesno(f"{operation_title} - QR Parameters", "Configure advanced QR code parameters?")
         qr_version, error_correction, box_size, border = None, "L", 10, 4
+        png_quality, svg_precision = 85, 2
         
         if advanced_qr:
             # QR Version
@@ -805,6 +883,22 @@ def main():
                 messagebox.showerror("Validation Error", border_result)
                 return
             border = border_result
+            
+            # Format-specific options
+            if format == 'png':
+                quality_input = simpledialog.askstring(f"{operation_title} - PNG Options", "PNG quality (0-100, higher is better):", initialvalue="85")
+                quality_valid, quality_result = validate_png_quality(quality_input)
+                if not quality_valid:
+                    messagebox.showerror("Validation Error", quality_result)
+                    return
+                png_quality = quality_result
+            elif format == 'svg':
+                precision_input = simpledialog.askstring(f"{operation_title} - SVG Options", "SVG precision (decimal places 0-10):", initialvalue="2")
+                precision_valid, precision_result = validate_svg_precision(precision_input)
+                if not precision_valid:
+                    messagebox.showerror("Validation Error", precision_result)
+                    return
+                svg_precision = precision_result
 
         # Ask for filename customization options
         customize_filenames = messagebox.askyesno(f"{operation_title} - Filename Options", "Customize filename format?")
@@ -838,7 +932,8 @@ def main():
             preset_params = create_manual_mode_preset(
                 valid_uses, volume, end_date, color, format, security_code, suffix_code,
                 qr_version, error_correction, box_size, border,
-                filename_prefix, filename_suffix, use_payload_as_filename
+                filename_prefix, filename_suffix, use_payload_as_filename,
+                png_quality, svg_precision
             )
             success, result = save_preset(preset_name, preset_params)
             if success:
@@ -847,7 +942,7 @@ def main():
                 messagebox.showerror("Error", result)
 
     try:
-        create_qr_codes(valid_uses, volume, end_date, color, output_folder, format, count, security_code=security_code, suffix_code=suffix_code, qr_version=qr_version, error_correction=error_correction, box_size=box_size, border=border, filename_prefix=filename_prefix, filename_suffix=filename_suffix, use_payload_as_filename=use_payload_as_filename)
+        create_qr_codes(valid_uses, volume, end_date, color, output_folder, format, count, security_code=security_code, suffix_code=suffix_code, qr_version=qr_version, error_correction=error_correction, box_size=box_size, border=border, filename_prefix=filename_prefix, filename_suffix=filename_suffix, use_payload_as_filename=use_payload_as_filename, png_quality=png_quality, svg_precision=svg_precision)
         #messagebox.showinfo("Success", f"{count} QR codes generated successfully!")
 
         #if zip_output:
