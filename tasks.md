@@ -117,11 +117,11 @@ Base file: `generate_qr_codes_gui_loop.py`
 **Test**: Save preset, load it later, verify all parameters restored correctly  
 **Status**: ✅ Added comprehensive preset management system with save/load/delete functionality. Created preset directory management, JSON-based storage, support for both CSV and manual mode presets. Added preset menu with load/save/delete options. Enhanced both CSV and manual modes to use preset values when loaded. Created comprehensive tests in `tests/test_parameter_presets.py` covering all preset operations, error handling, and integration scenarios. Fixed existing tests to account for new preset dialog sequence
 
-### Task 17: Add batch operation mode selection
+### Task 17: Add batch operation mode selection ✅ COMPLETED
 **Start**: Add GUI option to choose between single/batch generation modes  
 **End**: Cleaner interface separating different generation workflows  
 **Test**: Switch between modes, verify appropriate dialogs appear  
-**Current**: Mixed interface
+**Status**: ✅ Redesigned the interface with clearer operation mode selection. Added three distinct modes: Single QR Code Generation (1 or few codes), Batch Sequential Generation (multiple codes with sequential parameters), and CSV Batch Generation (import from CSV file). Updated all dialog titles to reflect the current operation mode for better user experience. Enhanced count defaults (1 for single, 10 for batch). Created comprehensive tests in `tests/test_batch_operation_modes.py` covering all three modes and workflow testing. Updated existing tests to work with new dialog sequence
 
 ### Task 18: Add format-specific options
 **Start**: Show format-specific options (PNG quality, SVG precision) based on selection  

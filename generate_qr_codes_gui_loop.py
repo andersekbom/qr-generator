@@ -472,13 +472,19 @@ def main():
                 return
         # For choice "4" or "2", continue to parameter input
 
-    # Ask user to choose input mode (or use preset mode)
+    # Ask user to choose operation mode (or use preset mode)
     if loaded_preset:
-        input_mode = loaded_preset["mode"] == "csv"
+        batch_mode = loaded_preset["mode"] == "csv"
     else:
-        input_mode = messagebox.askyesno("Input Mode", "Use CSV file for input?\n\nYes = CSV file input\nNo = Manual parameter input")
+        batch_mode = messagebox.askyesno("Operation Mode", "Choose QR code generation mode:\n\nYes = Batch Generation (CSV file or multiple codes)\nNo = Single Generation (manual parameters)")
     
-    if input_mode:
+    if batch_mode:
+        # Batch mode - ask for specific batch type
+        csv_mode = messagebox.askyesno("Batch Mode", "Choose batch generation method:\n\nYes = Import from CSV file\nNo = Generate sequential codes with manual parameters")
+    else:
+        csv_mode = False
+    
+    if csv_mode:
         # CSV mode - get file and process it
         input_file = filedialog.askopenfilename(title="Select CSV File", filetypes=[("CSV Files", "*.csv")])
         if not input_file:
@@ -646,7 +652,14 @@ def main():
             messagebox.showerror("Error", f"Error processing CSV file: {e}")
             return
     
-    # Manual parameter input mode
+    elif batch_mode and not csv_mode:
+        # Sequential batch mode - generate multiple QR codes with sequential parameters
+        operation_title = "Batch Sequential Generation"
+    else:
+        # Single generation mode - generate one or a few QR codes
+        operation_title = "Single QR Code Generation"
+    
+    # Manual parameter input mode (both single and sequential batch)
     # Use preset values or ask user for input
     if loaded_preset and loaded_preset["mode"] == "manual":
         valid_uses = loaded_preset.get("valid_uses", "15")
@@ -663,7 +676,7 @@ def main():
             return
     else:
         # Validate valid_uses
-        valid_uses_input = simpledialog.askstring("Input", "Enter Valid uses (e.g. 15):")
+        valid_uses_input = simpledialog.askstring(operation_title, "Enter Valid uses (e.g. 15):")
         if not valid_uses_input:
             messagebox.showerror("Error", "No valid uses entered. Exiting.")
             return
@@ -675,7 +688,7 @@ def main():
         valid_uses = str(valid_uses_result)
 
         # Validate volume
-        volume_input = simpledialog.askstring("Input", "Enter Volume (e.g. 500):")
+        volume_input = simpledialog.askstring(operation_title, "Enter Volume (e.g. 500):")
         if not volume_input:
             messagebox.showerror("Error", "No volume entered. Exiting.")
             return
@@ -687,7 +700,7 @@ def main():
         volume = str(volume_result)
 
         # Validate end_date
-        end_date_input = simpledialog.askstring("Input", "Enter Valid Until date:", initialvalue="26.12.31")
+        end_date_input = simpledialog.askstring(operation_title, "Enter Valid Until date:", initialvalue="26.12.31")
         if not end_date_input:
             messagebox.showerror("Error", "No end date entered. Exiting.")
             return
@@ -699,7 +712,7 @@ def main():
         end_date = date_result
 
         # Validate color
-        color_input = simpledialog.askstring("Input", "Image color [hex or name]:", initialvalue="#000000")
+        color_input = simpledialog.askstring(operation_title, "Image color [hex or name]:", initialvalue="#000000")
         color_valid, color_result = validate_color_format(color_input)
         if not color_valid:
             messagebox.showerror("Validation Error", color_result)
@@ -707,7 +720,7 @@ def main():
         color = color_result
         
         # Validate format
-        format_input = simpledialog.askstring("Input", "Image format [png,svg]:", initialvalue="png")
+        format_input = simpledialog.askstring(operation_title, "Image format [png,svg]:", initialvalue="png")
         format_valid, format_result = validate_format(format_input)
         if not format_valid:
             messagebox.showerror("Validation Error", format_result)
@@ -715,18 +728,27 @@ def main():
         format = format_result
         
         # Ask for payload customization options
-        security_code = simpledialog.askstring("Input", "Enter security code:", initialvalue="SECD")
+        security_code = simpledialog.askstring(operation_title, "Enter security code:", initialvalue="SECD")
         if not security_code:
             messagebox.showerror("Error", "No security code entered. Exiting.")
             return
         
-        suffix_code = simpledialog.askstring("Input", "Enter suffix code:", initialvalue="23FF45EE")
+        suffix_code = simpledialog.askstring(operation_title, "Enter suffix code:", initialvalue="23FF45EE")
         if not suffix_code:
             messagebox.showerror("Error", "No suffix code entered. Exiting.")
             return
     
     # Validate count (always ask this even with presets since it's generation specific)
-    count = simpledialog.askinteger("Input", "How many QR codes to generate?", initialvalue=1)
+    if batch_mode and not csv_mode:
+        # Sequential batch mode - suggest more codes
+        default_count = 10
+        count_prompt = f"{operation_title} - How many sequential QR codes to generate?"
+    else:
+        # Single generation mode - suggest fewer codes
+        default_count = 1
+        count_prompt = f"{operation_title} - How many QR codes to generate?"
+    
+    count = simpledialog.askinteger(operation_title, count_prompt, initialvalue=default_count)
     if not count:
         messagebox.showerror("Error", "No count entered. Exiting.")
         return
@@ -748,12 +770,12 @@ def main():
         use_payload_as_filename = loaded_preset.get("use_payload_as_filename", True)
     else:
         # Ask for advanced QR code parameters
-        advanced_qr = messagebox.askyesno("QR Parameters", "Configure advanced QR code parameters?")
+        advanced_qr = messagebox.askyesno(f"{operation_title} - QR Parameters", "Configure advanced QR code parameters?")
         qr_version, error_correction, box_size, border = None, "L", 10, 4
         
         if advanced_qr:
             # QR Version
-            version_input = simpledialog.askstring("QR Parameters", "QR version (1-40 or 'auto'):", initialvalue="auto")
+            version_input = simpledialog.askstring(f"{operation_title} - QR Parameters", "QR version (1-40 or 'auto'):", initialvalue="auto")
             version_valid, version_result = validate_qr_version(version_input)
             if not version_valid:
                 messagebox.showerror("Validation Error", version_result)
@@ -761,7 +783,7 @@ def main():
             qr_version = version_result
             
             # Error correction
-            error_input = simpledialog.askstring("QR Parameters", "Error correction level (L/M/Q/H):", initialvalue="L")
+            error_input = simpledialog.askstring(f"{operation_title} - QR Parameters", "Error correction level (L/M/Q/H):", initialvalue="L")
             error_valid, error_result = validate_error_correction(error_input)
             if not error_valid:
                 messagebox.showerror("Validation Error", error_result)
@@ -769,7 +791,7 @@ def main():
             error_correction = error_result
             
             # Box size
-            box_size_input = simpledialog.askstring("QR Parameters", "Box size (pixels per module):", initialvalue="10")
+            box_size_input = simpledialog.askstring(f"{operation_title} - QR Parameters", "Box size (pixels per module):", initialvalue="10")
             box_size_valid, box_size_result = validate_integer_input(box_size_input, "Box size", 1, 50)
             if not box_size_valid:
                 messagebox.showerror("Validation Error", box_size_result)
@@ -777,7 +799,7 @@ def main():
             box_size = box_size_result
             
             # Border
-            border_input = simpledialog.askstring("QR Parameters", "Border size (modules):", initialvalue="4")
+            border_input = simpledialog.askstring(f"{operation_title} - QR Parameters", "Border size (modules):", initialvalue="4")
             border_valid, border_result = validate_integer_input(border_input, "Border", 0, 20)
             if not border_valid:
                 messagebox.showerror("Validation Error", border_result)
@@ -785,29 +807,29 @@ def main():
             border = border_result
 
         # Ask for filename customization options
-        customize_filenames = messagebox.askyesno("Filename Options", "Customize filename format?")
+        customize_filenames = messagebox.askyesno(f"{operation_title} - Filename Options", "Customize filename format?")
         filename_prefix, filename_suffix, use_payload_as_filename = "", "", True
         
         if customize_filenames:
-            filename_prefix = simpledialog.askstring("Filename Options", "Enter filename prefix (optional):") or ""
-            filename_suffix = simpledialog.askstring("Filename Options", "Enter filename suffix (optional):") or ""
-            use_payload_as_filename = messagebox.askyesno("Filename Options", "Use payload as filename base?\n\nYes = Use M-15-00000001-500-26.12.31-SECD-23FF45EE\nNo = Use qr_code_1, qr_code_2, etc.")
+            filename_prefix = simpledialog.askstring(f"{operation_title} - Filename Options", "Enter filename prefix (optional):") or ""
+            filename_suffix = simpledialog.askstring(f"{operation_title} - Filename Options", "Enter filename suffix (optional):") or ""
+            use_payload_as_filename = messagebox.askyesno(f"{operation_title} - Filename Options", "Use payload as filename base?\n\nYes = Use M-15-00000001-500-26.12.31-SECD-23FF45EE\nNo = Use qr_code_1, qr_code_2, etc.")
 
     # Output directory selection
-    use_custom_output = messagebox.askyesno("Output Directory", "Choose custom output directory?\n\nYes = Select directory\nNo = Use default 'output' folder")
+    use_custom_output = messagebox.askyesno(f"{operation_title} - Output Directory", "Choose custom output directory?\n\nYes = Select directory\nNo = Use default 'output' folder")
     output_folder = "output"
     
     if use_custom_output:
-        selected_dir = filedialog.askdirectory(title="Select Output Directory")
+        selected_dir = filedialog.askdirectory(title=f"Select Output Directory - {operation_title}")
         if selected_dir:
             output_folder = selected_dir
         else:
             messagebox.showinfo("Info", "No directory selected. Using default 'output' folder.")
 
-    zip_output = messagebox.askyesno("Input", "Add output files to a zip file?")
+    zip_output = messagebox.askyesno(f"{operation_title} - Output", "Add output files to a zip file?")
     zip_file_name = None
     if zip_output:
-        zip_file_name = simpledialog.askstring("Input", f"Enter zip file name:", initialvalue=f"QR-{valid_uses}-{volume}-{color}-{count}-{format}.zip")
+        zip_file_name = simpledialog.askstring(f"{operation_title} - Output", f"Enter zip file name:", initialvalue=f"QR-{valid_uses}-{volume}-{color}-{count}-{format}.zip")
 
     # Ask if user wants to save current parameters as preset (only if not using existing preset)
     if not loaded_preset and use_presets and choice == "2":

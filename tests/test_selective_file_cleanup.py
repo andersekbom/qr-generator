@@ -79,7 +79,8 @@ class TestSelectiveFileCleanup(unittest.TestCase):
         mock_tk.return_value.withdraw = MagicMock()
         mock_askyesno.side_effect = [
             False,  # No presets
-            True,   # CSV mode
+            True,   # Batch generation mode
+            True,   # CSV batch mode
             False,  # Skip first row
             False,  # No advanced QR parameters
             False,  # No filename customization
@@ -125,7 +126,8 @@ class TestSelectiveFileCleanup(unittest.TestCase):
         mock_tk.return_value.withdraw = MagicMock()
         mock_askyesno.side_effect = [
             False,  # No presets
-            True,   # CSV mode
+            True,   # Batch generation mode
+            True,   # CSV batch mode
             False,  # Skip first row
             False,  # No advanced QR parameters
             False,  # No filename customization
@@ -171,7 +173,8 @@ class TestSelectiveFileCleanup(unittest.TestCase):
         mock_tk.return_value.withdraw = MagicMock()
         mock_askyesno.side_effect = [
             False,  # No presets
-            True,   # CSV mode
+            True,   # Batch generation mode
+            True,   # CSV batch mode
             False,  # Skip first row
             False,  # No advanced QR parameters
             False,  # No filename customization
@@ -214,7 +217,7 @@ class TestSelectiveFileCleanup(unittest.TestCase):
         mock_tk.return_value.withdraw = MagicMock()
         mock_askyesno.side_effect = [
             False,  # No presets
-            False,  # Manual mode (not CSV)
+            False,  # Single generation mode (not batch)
             False,  # No advanced QR parameters
             False,  # No filename customization
             False,  # Use default output directory
@@ -254,7 +257,7 @@ class TestSelectiveFileCleanup(unittest.TestCase):
         mock_tk.return_value.withdraw = MagicMock()
         mock_askyesno.side_effect = [
             False,  # No presets
-            False,  # Manual mode (not CSV)
+            False,  # Single generation mode (not batch)
             False,  # No advanced QR parameters
             False,  # No filename customization
             False,  # Use default output directory
@@ -294,7 +297,7 @@ class TestSelectiveFileCleanup(unittest.TestCase):
         mock_tk.return_value.withdraw = MagicMock()
         mock_askyesno.side_effect = [
             False,  # No presets
-            False,  # Manual mode (not CSV)
+            False,  # Single generation mode (not batch)
             False,  # No advanced QR parameters
             False,  # No filename customization
             False,  # Use default output directory
