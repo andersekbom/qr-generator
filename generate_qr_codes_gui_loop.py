@@ -85,12 +85,47 @@ def validate_format(format_str):
     
     return True, format_str.lower()
 
+def validate_qr_version(version_str):
+    """Validate QR code version"""
+    if not version_str or version_str.lower() == 'auto':
+        return True, None
+    
+    try:
+        version = int(version_str)
+        if 1 <= version <= 40:
+            return True, version
+        else:
+            return False, "QR version must be between 1 and 40, or 'auto'"
+    except ValueError:
+        return False, "QR version must be a number between 1-40 or 'auto'"
+
+def validate_error_correction(level_str):
+    """Validate error correction level"""
+    if not level_str:
+        return False, "Error correction level cannot be empty"
+    
+    valid_levels = ['L', 'M', 'Q', 'H']
+    if level_str.upper() not in valid_levels:
+        return False, f"Error correction must be one of: {', '.join(valid_levels)}"
+    
+    return True, level_str.upper()
+
+def get_error_correction_level(level_str):
+    """Convert error correction string to qrcode constant"""
+    levels = {
+        'L': qrcode.constants.ERROR_CORRECT_L,
+        'M': qrcode.constants.ERROR_CORRECT_M,
+        'Q': qrcode.constants.ERROR_CORRECT_Q,
+        'H': qrcode.constants.ERROR_CORRECT_H
+    }
+    return levels.get(level_str.upper(), qrcode.constants.ERROR_CORRECT_L)
+
 def detect_delimiter(file_path):
     with open(file_path, "r") as infile:
         sample = infile.read(1024)
         return csv.Sniffer().sniff(sample).delimiter
 
-def create_qr_codes(valid_uses, volume, end_date, color, output_folder, format, count, csv_data=None, input_column=0, security_code="SECD", suffix_code="23FF45EE"):
+def create_qr_codes(valid_uses, volume, end_date, color, output_folder, format, count, csv_data=None, input_column=0, security_code="SECD", suffix_code="23FF45EE", qr_version=None, error_correction="L", box_size=10, border=4):
     """
     Create QR codes either from manual parameters or CSV data
     
@@ -99,10 +134,17 @@ def create_qr_codes(valid_uses, volume, end_date, color, output_folder, format, 
         input_column: Column index to use from CSV data
         security_code: Security code to include in payload (default: "SECD")
         suffix_code: Suffix code to include in payload (default: "23FF45EE")
+        qr_version: QR code version (1-40, None for auto)
+        error_correction: Error correction level (L, M, Q, H)
+        box_size: Size of each QR code box in pixels
+        border: Border size in boxes
         Other parameters: Used for manual mode or as defaults
     """
     os.makedirs(output_folder, exist_ok=True)
     factory = qrcode.image.svg.SvgFillImage if format == 'svg' else None
+    
+    # Get error correction level
+    error_correction_level = get_error_correction_level(error_correction)
 
     if csv_data is not None:
         # CSV mode: generate QR codes from CSV data
@@ -113,10 +155,10 @@ def create_qr_codes(valid_uses, volume, end_date, color, output_folder, format, 
             
             payload = row[input_column]
             qr = qrcode.QRCode(
-                version=None,
-                error_correction=qrcode.constants.ERROR_CORRECT_L,
-                box_size=10,
-                border=4,
+                version=qr_version,
+                error_correction=error_correction_level,
+                box_size=box_size,
+                border=border,
             )
             qr.add_data(payload, optimize=0)
             qr.make(fit=True)
@@ -137,10 +179,10 @@ def create_qr_codes(valid_uses, volume, end_date, color, output_folder, format, 
             serial = f"{i:08d}"
             payload = f"M-{valid_uses}-{serial}-{volume}-{end_date}-{security_code}-{suffix_code}"
             qr = qrcode.QRCode(
-                version=None,
-                error_correction=qrcode.constants.ERROR_CORRECT_L,
-                box_size=10,
-                border=4,
+                version=qr_version,
+                error_correction=error_correction_level,
+                box_size=box_size,
+                border=border,
             )
             qr.add_data(payload, optimize=0)
             qr.make(fit=True)
@@ -288,6 +330,43 @@ def main():
                 return
             color = color_result
             
+            # Ask for advanced QR code parameters
+            advanced_qr = messagebox.askyesno("QR Parameters", "Configure advanced QR code parameters?")
+            qr_version, error_correction, box_size, border = None, "L", 10, 4
+            
+            if advanced_qr:
+                # QR Version
+                version_input = simpledialog.askstring("QR Parameters", "QR version (1-40 or 'auto'):", initialvalue="auto")
+                version_valid, version_result = validate_qr_version(version_input)
+                if not version_valid:
+                    messagebox.showerror("Validation Error", version_result)
+                    return
+                qr_version = version_result
+                
+                # Error correction
+                error_input = simpledialog.askstring("QR Parameters", "Error correction level (L/M/Q/H):", initialvalue="L")
+                error_valid, error_result = validate_error_correction(error_input)
+                if not error_valid:
+                    messagebox.showerror("Validation Error", error_result)
+                    return
+                error_correction = error_result
+                
+                # Box size
+                box_size_input = simpledialog.askstring("QR Parameters", "Box size (pixels per module):", initialvalue="10")
+                box_size_valid, box_size_result = validate_integer_input(box_size_input, "Box size", 1, 50)
+                if not box_size_valid:
+                    messagebox.showerror("Validation Error", box_size_result)
+                    return
+                box_size = box_size_result
+                
+                # Border
+                border_input = simpledialog.askstring("QR Parameters", "Border size (modules):", initialvalue="4")
+                border_valid, border_result = validate_integer_input(border_input, "Border", 0, 20)
+                if not border_valid:
+                    messagebox.showerror("Validation Error", border_result)
+                    return
+                border = border_result
+            
             # Read CSV data
             with open(input_file, "r") as infile:
                 reader = csv.reader(infile, delimiter=delimiter)
@@ -308,7 +387,7 @@ def main():
             
             # For CSV mode, we don't use the sequential payload format, so we skip security_code and suffix_code
             # Generate QR codes from CSV data
-            create_qr_codes(None, None, None, color, output_folder, format, None, csv_data=rows, input_column=input_column)
+            create_qr_codes(None, None, None, color, output_folder, format, None, csv_data=rows, input_column=input_column, qr_version=qr_version, error_correction=error_correction, box_size=box_size, border=border)
             
             messagebox.showinfo("Success", f"{len(rows)} QR codes generated successfully from CSV!")
             
@@ -401,6 +480,43 @@ def main():
         messagebox.showerror("Error", "No suffix code entered. Exiting.")
         return
 
+    # Ask for advanced QR code parameters
+    advanced_qr = messagebox.askyesno("QR Parameters", "Configure advanced QR code parameters?")
+    qr_version, error_correction, box_size, border = None, "L", 10, 4
+    
+    if advanced_qr:
+        # QR Version
+        version_input = simpledialog.askstring("QR Parameters", "QR version (1-40 or 'auto'):", initialvalue="auto")
+        version_valid, version_result = validate_qr_version(version_input)
+        if not version_valid:
+            messagebox.showerror("Validation Error", version_result)
+            return
+        qr_version = version_result
+        
+        # Error correction
+        error_input = simpledialog.askstring("QR Parameters", "Error correction level (L/M/Q/H):", initialvalue="L")
+        error_valid, error_result = validate_error_correction(error_input)
+        if not error_valid:
+            messagebox.showerror("Validation Error", error_result)
+            return
+        error_correction = error_result
+        
+        # Box size
+        box_size_input = simpledialog.askstring("QR Parameters", "Box size (pixels per module):", initialvalue="10")
+        box_size_valid, box_size_result = validate_integer_input(box_size_input, "Box size", 1, 50)
+        if not box_size_valid:
+            messagebox.showerror("Validation Error", box_size_result)
+            return
+        box_size = box_size_result
+        
+        # Border
+        border_input = simpledialog.askstring("QR Parameters", "Border size (modules):", initialvalue="4")
+        border_valid, border_result = validate_integer_input(border_input, "Border", 0, 20)
+        if not border_valid:
+            messagebox.showerror("Validation Error", border_result)
+            return
+        border = border_result
+
     zip_output = messagebox.askyesno("Input", "Add output files to a zip file?")
     zip_file_name = None
     if zip_output:
@@ -408,7 +524,7 @@ def main():
 
     output_folder = "output"
     try:
-        create_qr_codes(valid_uses, volume, end_date, color, output_folder, format, count, security_code=security_code, suffix_code=suffix_code)
+        create_qr_codes(valid_uses, volume, end_date, color, output_folder, format, count, security_code=security_code, suffix_code=suffix_code, qr_version=qr_version, error_correction=error_correction, box_size=box_size, border=border)
         #messagebox.showinfo("Success", f"{count} QR codes generated successfully!")
 
         #if zip_output:

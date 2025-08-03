@@ -83,11 +83,11 @@ Base file: `generate_qr_codes_gui_loop.py`
 **Test**: Process large CSV file, verify progress bar displays correctly  
 **Status**: ✅ Already implemented! Both CSV mode (line 109) and manual mode (line 136) use tqdm with descriptive messages. CSV mode shows "Generating QR codes from CSV" and manual mode shows "Generating QR codes". Tests created in `tests/test_progress_bar.py` verify progress bar functionality in both modes
 
-### Task 12: Add configurable QR code parameters
+### Task 12: Add configurable QR code parameters ✅ COMPLETED
 **Start**: Add dialogs for version, error correction, box_size, border settings  
 **End**: User can customize QR code generation parameters via GUI  
 **Test**: Generate QR codes with different parameters, verify settings applied  
-**Current**: Hardcoded in qrcode.QRCode() calls
+**Status**: ✅ Added configurable QR code parameters: qr_version (1-40 or auto), error_correction (L/M/Q/H), box_size (1-50), border (0-20). Enhanced create_qr_codes() function with new parameters, added validation functions validate_qr_version() and validate_error_correction(), added GUI dialogs in both CSV and manual modes with "Configure advanced QR code parameters?" option. Tests created in `tests/test_configurable_qr_parameters.py`, maintains backward compatibility with default values
 
 ## File Management Enhancements
 
