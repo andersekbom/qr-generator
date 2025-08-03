@@ -1,0 +1,4 @@
+qrcode
+tqdm
+colorama
+pillow
