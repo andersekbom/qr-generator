@@ -441,8 +441,16 @@ def main():
             
             if zip_output:
                 zip_output_files(output_folder, zip_file_name, format)
-            
-            clean_output_folder(output_folder)
+                
+                # Ask about cleanup after zipping
+                cleanup_files = messagebox.askyesno("File Cleanup", "Delete original files after zipping?\n\nYes = Keep only zip file\nNo = Keep both zip and original files")
+                if cleanup_files:
+                    clean_output_folder(output_folder)
+            else:
+                # No zip created, ask if user wants to clean up anyway (unusual but possible)
+                cleanup_files = messagebox.askyesno("File Cleanup", "Delete generated files?\n\nYes = Delete all generated files\nNo = Keep generated files")
+                if cleanup_files:
+                    clean_output_folder(output_folder)
             return
             
         except FileNotFoundError:
@@ -597,7 +605,16 @@ def main():
         #if zip_output:
         zip_output_files(output_folder, zip_file_name, format)
 
-        clean_output_folder(output_folder)
+        if zip_output and zip_file_name:
+            # Ask about cleanup after zipping
+            cleanup_files = messagebox.askyesno("File Cleanup", "Delete original files after zipping?\n\nYes = Keep only zip file\nNo = Keep both zip and original files")
+            if cleanup_files:
+                clean_output_folder(output_folder)
+        else:
+            # No zip created, ask if user wants to clean up anyway (unusual but possible)
+            cleanup_files = messagebox.askyesno("File Cleanup", "Delete generated files?\n\nYes = Delete all generated files\nNo = Keep generated files")
+            if cleanup_files:
+                clean_output_folder(output_folder)
 
     except Exception as e:
         messagebox.showerror("Error", f"An error occurred: {e}")

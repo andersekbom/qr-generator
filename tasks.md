@@ -103,11 +103,11 @@ Base file: `generate_qr_codes_gui_loop.py`
 **Test**: Generate files with different naming patterns, verify names correct  
 **Status**: ✅ Added comprehensive filename customization with prefix, suffix, and base name options. Enhanced create_qr_codes() function with filename_prefix, filename_suffix, and use_payload_as_filename parameters. Added generate_custom_filename() function with special character cleanup and safe filename generation. Added GUI dialogs in both CSV and manual modes with "Customize filename format?" option. CSV mode supports payload-based or index-based naming. Manual mode supports payload-based or qr_code_N naming. Tests created in `tests/test_filename_customization.py` verify all customization options, special character handling, and integration
 
-### Task 15: Add selective file cleanup option
+### Task 15: Add selective file cleanup option ✅ COMPLETED
 **Start**: Make output folder cleanup optional via user choice  
 **End**: User can choose to keep generated files after zipping  
 **Test**: Generate and zip files, verify cleanup option works as selected  
-**Current**: Always cleans up files
+**Status**: ✅ Added selective file cleanup option to both CSV and manual modes. Replaced automatic cleanup with user choice dialogs. When zip is created, asks "Delete original files after zipping?" When no zip is created, asks "Delete generated files?" User can choose to keep files or clean them up. Enhanced both modes with consistent cleanup workflow. Tests created in `tests/test_selective_file_cleanup.py` verify cleanup choices, GUI workflow, and different scenarios (zip/no-zip, yes/no cleanup)
 
 ## User Experience Improvements
 
