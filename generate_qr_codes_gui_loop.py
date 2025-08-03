@@ -18,13 +18,15 @@ def detect_delimiter(file_path):
         sample = infile.read(1024)
         return csv.Sniffer().sniff(sample).delimiter
 
-def create_qr_codes(valid_uses, volume, end_date, color, output_folder, format, count, csv_data=None, input_column=0):
+def create_qr_codes(valid_uses, volume, end_date, color, output_folder, format, count, csv_data=None, input_column=0, security_code="SECD", suffix_code="23FF45EE"):
     """
     Create QR codes either from manual parameters or CSV data
     
     Args:
         csv_data: List of CSV rows (None for manual mode)
         input_column: Column index to use from CSV data
+        security_code: Security code to include in payload (default: "SECD")
+        suffix_code: Suffix code to include in payload (default: "23FF45EE")
         Other parameters: Used for manual mode or as defaults
     """
     os.makedirs(output_folder, exist_ok=True)
@@ -61,7 +63,7 @@ def create_qr_codes(valid_uses, volume, end_date, color, output_folder, format, 
         # Manual mode: generate QR codes with sequential serials
         for i in tqdm(range(1, count + 1), desc="Generating QR codes"):
             serial = f"{i:08d}"
-            payload = f"M-{valid_uses}-{serial}-{volume}-{end_date}-SECD-23FF45EE"
+            payload = f"M-{valid_uses}-{serial}-{volume}-{end_date}-{security_code}-{suffix_code}"
             qr = qrcode.QRCode(
                 version=None,
                 error_correction=qrcode.constants.ERROR_CORRECT_L,
@@ -218,6 +220,7 @@ def main():
             
             output_folder = "output"
             
+            # For CSV mode, we don't use the sequential payload format, so we skip security_code and suffix_code
             # Generate QR codes from CSV data
             create_qr_codes(None, None, None, color, output_folder, format, None, csv_data=rows, input_column=input_column)
             
@@ -259,6 +262,17 @@ def main():
         messagebox.showerror("Error", "Invalid count. Exiting.")
         return
 
+    # Ask for payload customization options
+    security_code = simpledialog.askstring("Input", "Enter security code:", initialvalue="SECD")
+    if not security_code:
+        messagebox.showerror("Error", "No security code entered. Exiting.")
+        return
+    
+    suffix_code = simpledialog.askstring("Input", "Enter suffix code:", initialvalue="23FF45EE")
+    if not suffix_code:
+        messagebox.showerror("Error", "No suffix code entered. Exiting.")
+        return
+
     zip_output = messagebox.askyesno("Input", "Add output files to a zip file?")
     zip_file_name = None
     if zip_output:
@@ -266,7 +280,7 @@ def main():
 
     output_folder = "output"
     try:
-        create_qr_codes(valid_uses, volume, end_date, color, output_folder, format, count)
+        create_qr_codes(valid_uses, volume, end_date, color, output_folder, format, count, security_code=security_code, suffix_code=suffix_code)
         #messagebox.showinfo("Success", f"{count} QR codes generated successfully!")
 
         #if zip_output:
