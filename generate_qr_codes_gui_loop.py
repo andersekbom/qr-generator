@@ -463,7 +463,6 @@ def colorize_svg(svg_file, color, background_color="#FFFFFF", svg_precision=2):
         
         # Apply precision formatting to numeric values in SVG
         if svg_precision < 10:  # Only apply precision formatting if it's reasonable
-            import re
             # Format decimal numbers to specified precision
             def format_number(match):
                 number = float(match.group())
