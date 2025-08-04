@@ -12,10 +12,7 @@ pip install -r requirements.txt
 ```
 
 ### Running Applications
-- **GUI-based QR code generator (from CSV)**: `python generate_qr_codes_gui.py`
-- **GUI-based QR code generator (with color support)**: `python generate_qr_codes_gui_loop.py` 
-- **Batch QR code generator (predefined format)**: `python generate_qr_codes_bw.py`
-- **Colored QR code generator (single file)**: `python colored_qr_works.py`
+- **Main QR code generator**: `python qr_generator.py`
 
 ## Architecture Overview
 
@@ -23,20 +20,14 @@ This is a Python-based QR code generation toolkit with multiple specialized gene
 
 ### Core Components
 
-1. **CSV-based Generator** (`generate_qr_codes.py`, `generate_qr_codes_gui.py`)
-   - Reads data from CSV files in `input/` directory
-   - Auto-detects CSV delimiters
-   - Supports configurable column selection
-   - Outputs to `output/` directory with automatic cleanup
-
-2. **Batch Generator** (`generate_qr_codes_bw.py`)
-   - Generates QR codes with predefined payload format: `M-{usage_limit}-{volume}-{sequence}-{expiry_date}`
-   - Designed for serialized code generation (e.g., product codes, vouchers)
-
-3. **Colored QR Generator** (`colored_qr_works.py`)
-   - Generates single SVG QR codes with custom colors
-   - Uses XML manipulation to ensure proper color application
-   - Supports both foreground and background color customization
+1. **Main QR Generator** (`qr_generator.py`)
+   - Unified application with multiple operation modes
+   - CSV import with auto-delimiter detection
+   - Manual parameter input for sequential generation
+   - Supports both PNG and SVG output formats
+   - Advanced configuration options (QR parameters, format-specific settings)
+   - Preset system for parameter management
+   - Custom filename and directory options
 
 ### Key Libraries
 - `qrcode`: Core QR code generation (supports PNG, SVG formats)

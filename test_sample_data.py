@@ -13,7 +13,7 @@ from pathlib import Path
 # Add the parent directory to the path so we can import the main module
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from generate_qr_codes_gui_loop import detect_delimiter, create_qr_codes
+from qr_generator import detect_delimiter, create_qr_codes
 
 
 def test_sample_file(file_path, expected_delimiter=None, test_column=0):

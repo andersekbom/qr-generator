@@ -7,7 +7,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from generate_qr_codes_gui_loop import validate_png_quality, validate_svg_precision
+from qr_generator import validate_png_quality, validate_svg_precision
 
 def test_png_quality_validation():
     """Test PNG quality validation"""
@@ -71,7 +71,7 @@ def test_format_specific_parameters():
     """Test that format-specific parameters can be passed to create_qr_codes"""
     print("Testing format-specific parameters...")
     
-    from generate_qr_codes_gui_loop import create_qr_codes
+    from qr_generator import create_qr_codes
     import tempfile
     import os
     
