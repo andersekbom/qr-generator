@@ -5,7 +5,7 @@ Test script for format-specific options (Task 18)
 
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from qr_generator import validate_png_quality, validate_svg_precision
 

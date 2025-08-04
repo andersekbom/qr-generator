@@ -11,7 +11,7 @@ import csv
 from pathlib import Path
 
 # Add the parent directory to the path so we can import the main module
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from qr_generator import detect_delimiter, create_qr_codes
 
