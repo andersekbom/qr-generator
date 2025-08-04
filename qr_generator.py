@@ -590,8 +590,11 @@ class QRGeneratorGUI:
         # Preset Management Section (Task 23) - IMPLEMENTED
         self.create_preset_management_section()
         
+        # CSV File Selection Section (Task 24) - IMPLEMENTED
+        self.create_csv_file_section()
+        
         # Additional placeholder sections for other tasks
-        # TODO: Task 24-35 sections will be added here
+        # TODO: Task 25-35 sections will be added here
     
     def create_footer_section(self):
         """Create footer with main action buttons"""
@@ -636,7 +639,8 @@ class QRGeneratorGUI:
             text="Single Generation\nGenerate 1 or a few QR codes with same parameters",
             variable=self.operation_mode,
             value="single",
-            font=ctk.CTkFont(size=12)
+            font=ctk.CTkFont(size=12),
+            command=self.on_mode_change
         )
         self.mode_single.grid(row=1, column=0, padx=20, pady=5, sticky="w")
         
@@ -645,7 +649,8 @@ class QRGeneratorGUI:
             text="Batch Sequential Generation\nGenerate multiple QR codes with sequential numbering",
             variable=self.operation_mode,
             value="batch",
-            font=ctk.CTkFont(size=12)
+            font=ctk.CTkFont(size=12),
+            command=self.on_mode_change
         )
         self.mode_batch.grid(row=1, column=1, padx=20, pady=5, sticky="w")
         
@@ -654,7 +659,8 @@ class QRGeneratorGUI:
             text="CSV Import\nGenerate QR codes from data in a CSV file",
             variable=self.operation_mode,
             value="csv",
-            font=ctk.CTkFont(size=12)
+            font=ctk.CTkFont(size=12),
+            command=self.on_mode_change
         )
         self.mode_csv.grid(row=1, column=2, padx=20, pady=5, sticky="w")
         
@@ -795,6 +801,162 @@ class QRGeneratorGUI:
                 self.preset_status.configure(text="Deletion cancelled", text_color="gray")
         else:
             self.preset_status.configure(text="Please select a preset to delete", text_color="orange")
+    
+    def create_csv_file_section(self):
+        """Create CSV file selection widget with browse button (Task 24)"""
+        self.csv_frame = ctk.CTkFrame(self.content_frame)
+        self.csv_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=10)
+        self.csv_frame.grid_columnconfigure(1, weight=1)
+        
+        # Section title
+        ctk.CTkLabel(
+            self.csv_frame, 
+            text="CSV File Selection:", 
+            font=ctk.CTkFont(weight="bold", size=16)
+        ).grid(row=0, column=0, columnspan=3, padx=20, pady=(15, 10), sticky="w")
+        
+        # File path display
+        self.csv_path_entry = ctk.CTkEntry(
+            self.csv_frame,
+            textvariable=self.csv_file_path,
+            placeholder_text="No CSV file selected...",
+            state="readonly",
+            width=400
+        )
+        self.csv_path_entry.grid(row=1, column=0, padx=20, pady=10, sticky="ew")
+        
+        # Browse button
+        self.browse_csv_btn = ctk.CTkButton(
+            self.csv_frame,
+            text="Browse CSV",
+            width=120,
+            command=self.browse_csv_file
+        )
+        self.browse_csv_btn.grid(row=1, column=1, padx=10, pady=10, sticky="w")
+        
+        # Clear button
+        self.clear_csv_btn = ctk.CTkButton(
+            self.csv_frame,
+            text="Clear",
+            width=80,
+            command=self.clear_csv_file,
+            fg_color="gray",
+            hover_color="darkgray"
+        )
+        self.clear_csv_btn.grid(row=1, column=2, padx=10, pady=10, sticky="w")
+        
+        # CSV options sub-section
+        csv_options_frame = ctk.CTkFrame(self.csv_frame)
+        csv_options_frame.grid(row=2, column=0, columnspan=3, sticky="ew", padx=15, pady=(10, 15))
+        csv_options_frame.grid_columnconfigure(1, weight=1)
+        
+        # Delimiter detection display
+        ctk.CTkLabel(csv_options_frame, text="Detected delimiter:", font=ctk.CTkFont(size=12)).grid(
+            row=0, column=0, padx=15, pady=8, sticky="w")
+        
+        self.delimiter_label = ctk.CTkLabel(
+            csv_options_frame, 
+            text="(will detect when file selected)",
+            text_color="gray",
+            font=ctk.CTkFont(size=12)
+        )
+        self.delimiter_label.grid(row=0, column=1, padx=15, pady=8, sticky="w")
+        
+        # Column selection
+        ctk.CTkLabel(csv_options_frame, text="Data column:", font=ctk.CTkFont(size=12)).grid(
+            row=1, column=0, padx=15, pady=8, sticky="w")
+        
+        self.csv_column = tk.IntVar(value=0)
+        self.column_spinbox = ctk.CTkEntry(
+            csv_options_frame,
+            width=80,
+            placeholder_text="0"
+        )
+        self.column_spinbox.grid(row=1, column=1, padx=15, pady=8, sticky="w")
+        
+        # Header skip option
+        self.skip_header = tk.BooleanVar(value=False)
+        self.header_checkbox = ctk.CTkCheckBox(
+            csv_options_frame,
+            text="Skip first row (header)",
+            variable=self.skip_header,
+            font=ctk.CTkFont(size=12)
+        )
+        self.header_checkbox.grid(row=2, column=0, columnspan=2, padx=15, pady=8, sticky="w")
+        
+        # Initially hide the CSV section (show only when CSV mode selected)
+        self.csv_frame.grid_remove()
+    
+    def browse_csv_file(self):
+        """Open file dialog to select CSV file"""
+        try:
+            from tkinter import filedialog
+            file_path = filedialog.askopenfilename(
+                title="Select CSV File",
+                filetypes=[("CSV Files", "*.csv"), ("Text Files", "*.txt"), ("All Files", "*.*")]
+            )
+            
+            if file_path:
+                self.csv_file_path.set(file_path)
+                self.detect_csv_properties(file_path)
+        except Exception as e:
+            self.preset_status.configure(text=f"❌ Error selecting file: {e}", text_color="red")
+    
+    def clear_csv_file(self):
+        """Clear the selected CSV file"""
+        self.csv_file_path.set("")
+        self.delimiter_label.configure(text="(will detect when file selected)", text_color="gray")
+        self.column_spinbox.delete(0, 'end')
+        self.column_spinbox.insert(0, "0")
+        self.skip_header.set(False)
+    
+    def detect_csv_properties(self, file_path):
+        """Detect and display CSV file properties"""
+        try:
+            # Use existing detect_delimiter function
+            detected_delimiter = detect_delimiter(file_path)
+            
+            # Display delimiter in a user-friendly way
+            delimiter_names = {
+                ',': 'comma (,)',
+                ';': 'semicolon (;)',
+                '\t': 'tab',
+                '|': 'pipe (|)'
+            }
+            delimiter_display = delimiter_names.get(detected_delimiter, f"'{detected_delimiter}'")
+            
+            self.delimiter_label.configure(
+                text=delimiter_display, 
+                text_color="green"
+            )
+            
+            # TODO: Task 31 - Add CSV preview functionality here
+            
+        except Exception as e:
+            self.delimiter_label.configure(
+                text=f"Error: {str(e)}", 
+                text_color="red"
+            )
+    
+    def show_csv_section(self, show=True):
+        """Show or hide the CSV file selection section"""
+        if show:
+            self.csv_frame.grid()
+        else:
+            self.csv_frame.grid_remove()
+    
+    def on_mode_change(self):
+        """Handle operation mode changes to show/hide relevant sections"""
+        mode = self.operation_mode.get()
+        
+        # Show/hide CSV section based on mode
+        if mode == "csv":
+            self.show_csv_section(True)
+            self.status_label.configure(text="CSV mode selected - choose a CSV file to import data")
+        else:
+            self.show_csv_section(False)
+            mode_names = {"single": "Single Generation", "batch": "Batch Sequential"}
+            self.status_label.configure(text=f"{mode_names[mode]} mode selected")
     
     def init_default_values(self):
         """Initialize default values for the form"""
