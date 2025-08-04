@@ -554,6 +554,9 @@ class QRGeneratorGUI:
         
         # Initialize with default values
         self.init_default_values()
+        
+        # Load saved configuration (Task 34)
+        self.load_configuration()
     
     def center_window(self):
         """Center the main window on the screen"""
@@ -570,6 +573,9 @@ class QRGeneratorGUI:
         self.root.grid_columnconfigure(0, weight=1)
         self.root.grid_rowconfigure(1, weight=1)
         
+        # Menu bar (Task 33)
+        self.create_menu_bar()
+        
         # Header section
         self.create_header_section()
         
@@ -578,6 +584,76 @@ class QRGeneratorGUI:
         
         # Footer with action buttons
         self.create_footer_section()
+        
+        # Keyboard shortcuts (Task 33)
+        self.setup_keyboard_shortcuts()
+    
+    def create_menu_bar(self):
+        """Create menu bar with keyboard shortcuts (Task 33)"""
+        try:
+            # Create menu bar
+            self.menubar = tk.Menu(self.root)
+            self.root.configure(menu=self.menubar)
+            
+            # File menu
+            file_menu = tk.Menu(self.menubar, tearoff=0)
+            self.menubar.add_cascade(label="File", menu=file_menu)
+            file_menu.add_command(label="New Session", command=self.new_session, accelerator="Ctrl+N")
+            file_menu.add_separator()
+            file_menu.add_command(label="Open CSV...", command=self.browse_csv_file, accelerator="Ctrl+O")
+            file_menu.add_separator()
+            file_menu.add_command(label="Generate QR Codes", command=self.generate_qr_codes, accelerator="Ctrl+G")
+            file_menu.add_separator()
+            file_menu.add_command(label="Exit", command=self.root.quit, accelerator="Ctrl+Q")
+            
+            # Edit menu
+            edit_menu = tk.Menu(self.menubar, tearoff=0)
+            self.menubar.add_cascade(label="Edit", menu=edit_menu)
+            edit_menu.add_command(label="Clear Form", command=self.clear_form, accelerator="Ctrl+R")
+            edit_menu.add_separator()
+            edit_menu.add_command(label="Load Preset...", command=self.load_preset_dialog, accelerator="Ctrl+L")
+            edit_menu.add_command(label="Save Preset...", command=self.save_preset_dialog, accelerator="Ctrl+S")
+            
+            # View menu
+            view_menu = tk.Menu(self.menubar, tearoff=0)
+            self.menubar.add_cascade(label="View", menu=view_menu)
+            view_menu.add_command(label="Toggle Theme", command=self.toggle_theme, accelerator="Ctrl+T")
+            view_menu.add_separator()
+            view_menu.add_command(label="Clear Results", command=self.clear_results, accelerator="Ctrl+Shift+C")
+            view_menu.add_command(label="Open Output Folder", command=self.open_output_folder, accelerator="Ctrl+Shift+O")
+            
+            # Help menu
+            help_menu = tk.Menu(self.menubar, tearoff=0)
+            self.menubar.add_cascade(label="Help", menu=help_menu)
+            help_menu.add_command(label="About", command=self.show_about, accelerator="F1")
+            
+        except Exception as e:
+            print(f"Menu bar creation failed: {e}")
+    
+    def setup_keyboard_shortcuts(self):
+        """Setup keyboard shortcuts (Task 33)"""
+        try:
+            # File shortcuts
+            self.root.bind('<Control-n>', lambda e: self.new_session())
+            self.root.bind('<Control-o>', lambda e: self.browse_csv_file())
+            self.root.bind('<Control-g>', lambda e: self.generate_qr_codes())
+            self.root.bind('<Control-q>', lambda e: self.root.quit())
+            
+            # Edit shortcuts
+            self.root.bind('<Control-r>', lambda e: self.clear_form())
+            self.root.bind('<Control-l>', lambda e: self.load_preset_dialog())
+            self.root.bind('<Control-s>', lambda e: self.save_preset_dialog())
+            
+            # View shortcuts
+            self.root.bind('<Control-t>', lambda e: self.toggle_theme())
+            self.root.bind('<Control-Shift-C>', lambda e: self.clear_results())
+            self.root.bind('<Control-Shift-O>', lambda e: self.open_output_folder())
+            
+            # Help shortcuts
+            self.root.bind('<F1>', lambda e: self.show_about())
+            
+        except Exception as e:
+            print(f"Keyboard shortcuts setup failed: {e}")
     
     def create_header_section(self):
         """Create header with title and theme toggle"""
@@ -632,8 +708,72 @@ class QRGeneratorGUI:
         # Output Configuration Section (Task 28) - IMPLEMENTED
         self.create_output_config_section()
         
+        # Results Viewer Section (Task 32) - IMPLEMENTED
+        self.create_results_viewer_section()
+        
         # Additional placeholder sections for other tasks
         # TODO: Task 27, 29-35 sections will be added here
+    
+    def create_results_viewer_section(self):
+        """Create generation results viewer with thumbnails (Task 32)"""
+        self.results_frame = ctk.CTkFrame(self.content_frame)
+        self.results_frame.grid(row=7, column=0, sticky="ew", padx=10, pady=10)
+        self.results_frame.grid_columnconfigure(0, weight=1)
+        
+        # Section title
+        self.results_title = ctk.CTkLabel(
+            self.results_frame,
+            text="Generation Results:",
+            font=ctk.CTkFont(weight="bold", size=16)
+        )
+        self.results_title.grid(row=0, column=0, padx=20, pady=(15, 10), sticky="w")
+        
+        # Results summary
+        self.results_summary = ctk.CTkLabel(
+            self.results_frame,
+            text="No QR codes generated yet",
+            font=ctk.CTkFont(size=12),
+            text_color="gray"
+        )
+        self.results_summary.grid(row=1, column=0, padx=20, pady=5, sticky="w")
+        
+        # Scrollable frame for thumbnails
+        self.thumbnails_frame = ctk.CTkScrollableFrame(
+            self.results_frame,
+            height=200,
+            orientation="horizontal"
+        )
+        self.thumbnails_frame.grid(row=2, column=0, padx=20, pady=10, sticky="ew")
+        
+        # Action buttons
+        buttons_frame = ctk.CTkFrame(self.results_frame)
+        buttons_frame.grid(row=3, column=0, padx=20, pady=(0, 15), sticky="ew")
+        buttons_frame.grid_columnconfigure(0, weight=1)
+        
+        # Open folder button
+        self.open_folder_btn = ctk.CTkButton(
+            buttons_frame,
+            text="Open Output Folder",
+            width=150,
+            command=self.open_output_folder,
+            state="disabled"
+        )
+        self.open_folder_btn.grid(row=0, column=0, padx=10, pady=10, sticky="w")
+        
+        # Clear results button
+        self.clear_results_btn = ctk.CTkButton(
+            buttons_frame,
+            text="Clear Results",
+            width=120,
+            command=self.clear_results,
+            fg_color="gray",
+            hover_color="darkgray",
+            state="disabled"
+        )
+        self.clear_results_btn.grid(row=0, column=1, padx=10, pady=10, sticky="w")
+        
+        # Initially hide the results section
+        self.results_frame.grid_remove()
     
     def create_footer_section(self):
         """Create footer with main action buttons"""
@@ -913,8 +1053,77 @@ class QRGeneratorGUI:
         )
         self.header_checkbox.grid(row=2, column=0, columnspan=2, padx=15, pady=8, sticky="w")
         
+        # CSV Preview Table (Task 31)
+        self.create_csv_preview_table()
+        
         # Initially hide the CSV section (show only when CSV mode selected)
         self.csv_frame.grid_remove()
+    
+    def create_csv_preview_table(self):
+        """Create CSV preview and column selection table (Task 31)"""
+        # Preview frame
+        preview_frame = ctk.CTkFrame(self.csv_frame)
+        preview_frame.grid(row=4, column=0, columnspan=3, padx=20, pady=10, sticky="ew")
+        preview_frame.grid_columnconfigure(0, weight=1)
+        
+        # Preview title
+        ctk.CTkLabel(
+            preview_frame,
+            text="CSV Preview:",
+            font=ctk.CTkFont(weight="bold", size=14)
+        ).grid(row=0, column=0, padx=15, pady=(10, 5), sticky="w")
+        
+        # Create Treeview for table display
+        try:
+            import tkinter.ttk as ttk
+            
+            # Style the treeview to match CustomTkinter theme
+            style = ttk.Style()
+            
+            # Table frame with scrollbars
+            table_frame = tk.Frame(preview_frame, bg=preview_frame.cget("fg_color")[1])
+            table_frame.grid(row=1, column=0, padx=15, pady=(5, 15), sticky="ew")
+            table_frame.grid_columnconfigure(0, weight=1)
+            
+            # Create treeview with scrollbars
+            self.csv_tree = ttk.Treeview(table_frame, height=8, show='tree headings')
+            
+            # Scrollbars
+            v_scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.csv_tree.yview)
+            h_scrollbar = ttk.Scrollbar(table_frame, orient="horizontal", command=self.csv_tree.xview)
+            
+            self.csv_tree.configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set)
+            
+            # Grid layout
+            self.csv_tree.grid(row=0, column=0, sticky="nsew")
+            v_scrollbar.grid(row=0, column=1, sticky="ns")
+            h_scrollbar.grid(row=1, column=0, sticky="ew")
+            
+            # Configure grid weights
+            table_frame.grid_rowconfigure(0, weight=1)
+            table_frame.grid_columnconfigure(0, weight=1)
+            
+            # Column selection info
+            self.column_info_label = ctk.CTkLabel(
+                preview_frame,
+                text="Select column above or click column header to use as QR data",
+                font=ctk.CTkFont(size=11),
+                text_color="gray"
+            )
+            self.column_info_label.grid(row=2, column=0, padx=15, pady=(0, 10), sticky="w")
+            
+            # Bind column selection
+            self.csv_tree.bind('<Button-1>', self.on_column_select)
+            
+        except ImportError:
+            # Fallback if ttk is not available
+            fallback_label = ctk.CTkLabel(
+                preview_frame,
+                text="CSV preview not available (requires tkinter.ttk)",
+                font=ctk.CTkFont(size=11),
+                text_color="orange"
+            )
+            fallback_label.grid(row=1, column=0, padx=15, pady=15)
     
     def browse_csv_file(self):
         """Open file dialog to select CSV file"""
@@ -959,13 +1168,106 @@ class QRGeneratorGUI:
                 text_color="green"
             )
             
-            # TODO: Task 31 - Add CSV preview functionality here
+            # Load and display CSV preview
+            self.load_csv_preview(file_path, detected_delimiter)
             
         except Exception as e:
             self.delimiter_label.configure(
                 text=f"Error: {str(e)}", 
                 text_color="red"
             )
+    
+    def load_csv_preview(self, file_path, delimiter):
+        """Load CSV data into preview table (Task 31)"""
+        try:
+            if not hasattr(self, 'csv_tree'):
+                return
+                
+            import csv
+            
+            # Clear existing data
+            for item in self.csv_tree.get_children():
+                self.csv_tree.delete(item)
+            
+            # Read CSV file
+            with open(file_path, 'r', encoding='utf-8') as file:
+                reader = csv.reader(file, delimiter=delimiter)
+                rows = list(reader)
+            
+            if not rows:
+                return
+            
+            # Setup columns based on first row
+            first_row = rows[0]
+            num_columns = len(first_row)
+            
+            # Configure treeview columns
+            columns = [f"col_{i}" for i in range(num_columns)]
+            self.csv_tree['columns'] = columns
+            self.csv_tree['show'] = 'headings'
+            
+            # Setup column headers and widths
+            for i, col in enumerate(columns):
+                header = f"Column {i}" if len(first_row[i]) > 20 else first_row[i]
+                self.csv_tree.heading(col, text=header, command=lambda c=i: self.select_column(c))
+                self.csv_tree.column(col, width=150, anchor='w')
+            
+            # Add data (limit to first 20 rows for performance)
+            max_rows = min(20, len(rows))
+            for row_idx, row in enumerate(rows[:max_rows]):
+                # Pad row if it has fewer columns than expected
+                padded_row = row + [''] * (num_columns - len(row))
+                padded_row = padded_row[:num_columns]  # Truncate if too many columns
+                
+                # Truncate long cell values for display
+                display_row = [cell[:50] + '...' if len(cell) > 50 else cell for cell in padded_row]
+                
+                self.csv_tree.insert('', 'end', values=display_row)
+            
+            # Update info label
+            total_rows = len(rows)
+            self.column_info_label.configure(
+                text=f"Showing {max_rows} of {total_rows} rows. Click column header to select for QR data."
+            )
+            
+        except Exception as e:
+            if hasattr(self, 'column_info_label'):
+                self.column_info_label.configure(text=f"Error loading preview: {str(e)}")
+    
+    def on_column_select(self, event):
+        """Handle column selection from table click (Task 31)"""
+        try:
+            if not hasattr(self, 'csv_tree'):
+                return
+                
+            # Get the clicked column
+            region = self.csv_tree.identify_region(event.x, event.y)
+            if region == "heading":
+                column = self.csv_tree.identify_column(event.x, event.y)
+                if column:
+                    # Column IDs are like '#1', '#2', etc.
+                    col_index = int(column.replace('#', '')) - 1
+                    self.select_column(col_index)
+        except Exception:
+            pass  # Ignore click handling errors
+    
+    def select_column(self, column_index):
+        """Select a column for QR data generation (Task 31)"""
+        try:
+            # Update the column spinbox
+            self.column_spinbox.delete(0, 'end')
+            self.column_spinbox.insert(0, str(column_index))
+            self.csv_column.set(column_index)
+            
+            # Update info label
+            self.column_info_label.configure(
+                text=f"Selected column {column_index} for QR code data",
+                text_color="green"
+            )
+            
+        except Exception as e:
+            if hasattr(self, 'column_info_label'):
+                self.column_info_label.configure(text=f"Error selecting column: {str(e)}")
     
     def show_csv_section(self, show=True):
         """Show or hide the CSV file selection section"""
@@ -1717,7 +2019,7 @@ class QRGeneratorGUI:
                 format=self.format.get(),
                 count=1,
                 csv_data=csv_data,
-                input_column=0,  # Default to first column
+                input_column=self.csv_column.get(),  # Use selected column from preview table
                 security_code=self.security_code.get(),
                 suffix_code=self.suffix_code.get(),
                 qr_version=int(self.qr_version.get()) if self.qr_version.get() else None,
@@ -1740,6 +2042,9 @@ class QRGeneratorGUI:
                 self.cleanup_temp_files(result_folder)
             
             self.status_label.configure(text=f"✅ Generated {len(csv_data)} QR codes successfully!", text_color="green")
+            
+            # Display results (Task 32)
+            self.display_generation_results(result_folder, len(csv_data))
             
         except Exception as e:
             self.status_label.configure(text=f"Error processing CSV: {str(e)}", text_color="red")
@@ -1793,6 +2098,9 @@ class QRGeneratorGUI:
             else:
                 self.status_label.configure(text=f"✅ Generated {count} QR codes successfully!", text_color="green")
             
+            # Display results (Task 32)
+            self.display_generation_results(result_folder, count)
+            
         except Exception as e:
             self.status_label.configure(text=f"Error generating QR codes: {str(e)}", text_color="red")
     
@@ -1829,8 +2137,436 @@ class QRGeneratorGUI:
         except Exception as e:
             self.status_label.configure(text=f"Warning: Cleanup failed: {str(e)}", text_color="orange")
     
+    def display_generation_results(self, result_folder, file_count):
+        """Display generation results with thumbnails (Task 32)"""
+        try:
+            # Show results section
+            self.results_frame.grid()
+            
+            # Update summary
+            self.results_summary.configure(
+                text=f"Generated {file_count} QR code(s) in: {result_folder}",
+                text_color="green"
+            )
+            
+            # Clear existing thumbnails
+            for widget in self.thumbnails_frame.winfo_children():
+                widget.destroy()
+            
+            # Load thumbnails for PNG files only (SVG thumbnails are more complex)
+            png_files = []
+            if os.path.exists(result_folder):
+                for file in os.listdir(result_folder):
+                    if file.lower().endswith('.png'):
+                        png_files.append(os.path.join(result_folder, file))
+            
+            # Display thumbnails (limit to first 10 for performance)
+            for i, file_path in enumerate(png_files[:10]):
+                self.create_thumbnail(file_path, i)
+            
+            # Enable buttons
+            self.open_folder_btn.configure(state="normal")
+            self.clear_results_btn.configure(state="normal")
+            
+            # Store result folder for opening
+            self.last_result_folder = result_folder
+            
+        except Exception as e:
+            self.results_summary.configure(
+                text=f"Error displaying results: {str(e)}",
+                text_color="red"
+            )
+    
+    def create_thumbnail(self, file_path, index):
+        """Create a thumbnail widget for a QR code file (Task 32)"""
+        try:
+            from PIL import Image, ImageTk
+            
+            # Create thumbnail frame
+            thumb_frame = ctk.CTkFrame(self.thumbnails_frame, width=120, height=140)
+            thumb_frame.grid(row=0, column=index, padx=5, pady=5)
+            thumb_frame.grid_propagate(False)
+            
+            # Load and resize image
+            image = Image.open(file_path)
+            image.thumbnail((80, 80), Image.Resampling.LANCZOS)
+            photo = ImageTk.PhotoImage(image)
+            
+            # Image label
+            image_label = tk.Label(
+                thumb_frame, 
+                image=photo,
+                bg=thumb_frame.cget("fg_color")[1]
+            )
+            image_label.image = photo  # Keep reference
+            image_label.pack(pady=(10, 5))
+            
+            # Filename label
+            filename = os.path.basename(file_path)
+            if len(filename) > 15:
+                filename = filename[:12] + "..."
+            
+            name_label = ctk.CTkLabel(
+                thumb_frame,
+                text=filename,
+                font=ctk.CTkFont(size=10)
+            )
+            name_label.pack(pady=(0, 5))
+            
+            # Click to open file
+            def open_file():
+                try:
+                    import subprocess
+                    import platform
+                    
+                    if platform.system() == "Darwin":  # macOS
+                        subprocess.call(["open", file_path])
+                    elif platform.system() == "Windows":
+                        os.startfile(file_path)
+                    else:  # Linux
+                        subprocess.call(["xdg-open", file_path])
+                except Exception:
+                    pass
+            
+            image_label.bind("<Button-1>", lambda e: open_file())
+            thumb_frame.bind("<Button-1>", lambda e: open_file())
+            
+        except ImportError:
+            # Fallback if PIL is not available
+            thumb_frame = ctk.CTkFrame(self.thumbnails_frame, width=120, height=140)
+            thumb_frame.grid(row=0, column=index, padx=5, pady=5)
+            
+            ctk.CTkLabel(
+                thumb_frame,
+                text="📄\nQR Code",
+                font=ctk.CTkFont(size=12)
+            ).pack(expand=True)
+            
+        except Exception as e:
+            # Error creating thumbnail
+            thumb_frame = ctk.CTkFrame(self.thumbnails_frame, width=120, height=140)
+            thumb_frame.grid(row=0, column=index, padx=5, pady=5)
+            
+            ctk.CTkLabel(
+                thumb_frame,
+                text="❌\nError",
+                font=ctk.CTkFont(size=12),
+                text_color="red"
+            ).pack(expand=True)
+    
+    def open_output_folder(self):
+        """Open the output folder in file manager (Task 32)"""
+        try:
+            if hasattr(self, 'last_result_folder') and os.path.exists(self.last_result_folder):
+                import subprocess
+                import platform
+                
+                if platform.system() == "Darwin":  # macOS
+                    subprocess.call(["open", self.last_result_folder])
+                elif platform.system() == "Windows":
+                    os.startfile(self.last_result_folder)
+                else:  # Linux
+                    subprocess.call(["xdg-open", self.last_result_folder])
+            else:
+                self.results_summary.configure(
+                    text="Output folder no longer exists",
+                    text_color="orange"
+                )
+        except Exception as e:
+            self.results_summary.configure(
+                text=f"Error opening folder: {str(e)}",
+                text_color="red"
+            )
+    
+    def clear_results(self):
+        """Clear the results display (Task 32)"""
+        try:
+            # Clear thumbnails
+            for widget in self.thumbnails_frame.winfo_children():
+                widget.destroy()
+            
+            # Reset labels
+            self.results_summary.configure(
+                text="No QR codes generated yet",
+                text_color="gray"
+            )
+            
+            # Disable buttons
+            self.open_folder_btn.configure(state="disabled")
+            self.clear_results_btn.configure(state="disabled")
+            
+            # Hide results section
+            self.results_frame.grid_remove()
+            
+        except Exception as e:
+            self.results_summary.configure(
+                text=f"Error clearing results: {str(e)}",
+                text_color="red"
+            )
+    
+    def new_session(self):
+        """Start a new session by clearing all data (Task 33)"""
+        try:
+            self.clear_form()
+            self.clear_results()
+            self.status_label.configure(text="New session started", text_color="blue")
+        except Exception as e:
+            self.status_label.configure(text=f"Error starting new session: {str(e)}", text_color="red")
+    
+    def clear_form(self):
+        """Clear all form fields (Task 33)"""
+        try:
+            # Reset to default values
+            self.operation_mode.set("manual")
+            self.valid_uses.set("15")
+            self.volume.set("500")
+            self.end_date.set("26.12.31")
+            self.color.set("#000000")
+            self.security_code.set("SECD")
+            self.suffix_code.set("23FF45EE")
+            self.count.set(1)
+            self.format.set("png")
+            self.png_quality.set(85)
+            self.svg_precision.set(2)
+            self.qr_version.set("auto")
+            self.error_correction.set("L")
+            self.box_size.set(10)
+            self.border.set(4)
+            self.filename_prefix.set("")
+            self.filename_suffix.set("")
+            self.use_payload_filename.set(True)
+            self.output_directory.set("output")
+            self.create_zip.set(True)
+            self.cleanup_temp.set(False)
+            self.csv_file_path.set("")
+            self.selected_preset.set("Select preset...")
+            
+            # Update UI
+            self.on_mode_change()
+            self.status_label.configure(text="Form cleared", text_color="blue")
+        except Exception as e:
+            self.status_label.configure(text=f"Error clearing form: {str(e)}", text_color="red")
+    
+    def load_preset_dialog(self):
+        """Open dialog to load a preset (Task 33)"""
+        try:
+            from tkinter import simpledialog, messagebox
+            available_presets = list_presets()
+            
+            if not available_presets:
+                messagebox.showinfo("No Presets", "No presets available to load.")
+                return
+            
+            preset_name = simpledialog.askstring(
+                "Load Preset", 
+                f"Available presets: {', '.join(available_presets)}\\n\\nEnter preset name to load:"
+            )
+            
+            if preset_name:
+                success, result = load_preset(preset_name)
+                if success:
+                    self.load_preset_values(result)
+                    self.status_label.configure(text=f"Loaded preset: {preset_name}", text_color="green")
+                else:
+                    messagebox.showerror("Error", result)
+        except Exception as e:
+            self.status_label.configure(text=f"Error loading preset: {str(e)}", text_color="red")
+    
+    def save_preset_dialog(self):
+        """Open dialog to save current settings as preset (Task 33)"""
+        try:
+            from tkinter import simpledialog, messagebox
+            
+            preset_name = simpledialog.askstring("Save Preset", "Enter name for this preset:")
+            
+            if preset_name:
+                # Get current settings
+                preset_data = {
+                    "valid_uses": self.valid_uses.get(),
+                    "volume": self.volume.get(),
+                    "end_date": self.end_date.get(),
+                    "color": self.color.get(),
+                    "format": self.format.get(),
+                    "security_code": self.security_code.get(),
+                    "suffix_code": self.suffix_code.get(),
+                    "qr_version": self.qr_version.get(),
+                    "error_correction": self.error_correction.get(),
+                    "box_size": self.box_size.get(),
+                    "border": self.border.get(),
+                    "filename_prefix": self.filename_prefix.get(),
+                    "filename_suffix": self.filename_suffix.get(),
+                    "use_payload_as_filename": self.use_payload_filename.get(),
+                    "png_quality": self.png_quality.get(),
+                    "svg_precision": self.svg_precision.get()
+                }
+                
+                success, result = save_preset(preset_name, preset_data)
+                if success:
+                    self.refresh_preset_dropdown()
+                    self.status_label.configure(text=f"Saved preset: {preset_name}", text_color="green")
+                else:
+                    messagebox.showerror("Error", result)
+        except Exception as e:
+            self.status_label.configure(text=f"Error saving preset: {str(e)}", text_color="red")
+    
+    def show_about(self):
+        """Show about dialog (Task 33)"""
+        try:
+            from tkinter import messagebox
+            messagebox.showinfo(
+                "About QR Generator",
+                "QR Code Generator v2.0\\n\\n"
+                "Modern GUI for generating QR codes with customizable parameters.\\n\\n"
+                "Features:\\n"
+                "• Manual and CSV import modes\\n"
+                "• PNG and SVG output formats\\n"
+                "• Advanced QR code parameters\\n"
+                "• Preset management\\n"
+                "• Results viewer with thumbnails\\n\\n"
+                "Keyboard Shortcuts:\\n"
+                "Ctrl+N: New Session\\n"
+                "Ctrl+O: Open CSV\\n"
+                "Ctrl+G: Generate QR Codes\\n"
+                "Ctrl+T: Toggle Theme\\n"
+                "F1: About"
+            )
+        except Exception as e:
+            self.status_label.configure(text=f"Error showing about: {str(e)}", text_color="red")
+    
+    def get_config_path(self):
+        """Get path for configuration file (Task 34)"""
+        try:
+            import os
+            config_dir = os.path.expanduser("~/.qr_generator")
+            os.makedirs(config_dir, exist_ok=True)
+            return os.path.join(config_dir, "config.json")
+        except Exception:
+            return "qr_generator_config.json"  # Fallback to current directory
+    
+    def save_configuration(self):
+        """Save current configuration to file (Task 34)"""
+        try:
+            import json
+            
+            config = {
+                "window": {
+                    "geometry": self.root.geometry(),
+                    "theme": ctk.get_appearance_mode().lower()
+                },
+                "last_settings": {
+                    "operation_mode": self.operation_mode.get(),
+                    "valid_uses": self.valid_uses.get(),
+                    "volume": self.volume.get(),
+                    "end_date": self.end_date.get(),
+                    "color": self.color.get(),
+                    "security_code": self.security_code.get(),
+                    "suffix_code": self.suffix_code.get(),
+                    "count": self.count.get(),
+                    "format": self.format.get(),
+                    "png_quality": self.png_quality.get(),
+                    "svg_precision": self.svg_precision.get(),
+                    "qr_version": self.qr_version.get(),
+                    "error_correction": self.error_correction.get(),
+                    "box_size": self.box_size.get(),
+                    "border": self.border.get(),
+                    "filename_prefix": self.filename_prefix.get(),
+                    "filename_suffix": self.filename_suffix.get(),
+                    "use_payload_filename": self.use_payload_filename.get(),
+                    "output_directory": self.output_directory.get(),
+                    "create_zip": self.create_zip.get(),
+                    "cleanup_temp": self.cleanup_temp.get()
+                },
+                "ui_preferences": {
+                    "last_csv_path": getattr(self, 'last_csv_path', ''),
+                    "selected_preset": self.selected_preset.get()
+                }
+            }
+            
+            with open(self.get_config_path(), 'w') as f:
+                json.dump(config, f, indent=2)
+                
+        except Exception as e:
+            print(f"Failed to save configuration: {e}")
+    
+    def load_configuration(self):
+        """Load saved configuration from file (Task 34)"""
+        try:
+            import json
+            
+            config_path = self.get_config_path()
+            if not os.path.exists(config_path):
+                return
+            
+            with open(config_path, 'r') as f:
+                config = json.load(f)
+            
+            # Restore window settings
+            if "window" in config:
+                window_config = config["window"]
+                
+                # Restore geometry
+                if "geometry" in window_config:
+                    try:
+                        self.root.geometry(window_config["geometry"])
+                    except Exception:
+                        pass  # Invalid geometry, use default
+                
+                # Restore theme
+                if "theme" in window_config:
+                    try:
+                        ctk.set_appearance_mode(window_config["theme"])
+                    except Exception:
+                        pass  # Invalid theme, use default
+            
+            # Restore last settings
+            if "last_settings" in config:
+                settings = config["last_settings"]
+                
+                # Restore each setting if it exists
+                for key, value in settings.items():
+                    if hasattr(self, key):
+                        try:
+                            getattr(self, key).set(value)
+                        except Exception:
+                            pass  # Invalid value, keep default
+            
+            # Restore UI preferences
+            if "ui_preferences" in config:
+                prefs = config["ui_preferences"]
+                
+                if "last_csv_path" in prefs:
+                    self.last_csv_path = prefs["last_csv_path"]
+                
+                if "selected_preset" in prefs:
+                    try:
+                        self.selected_preset.set(prefs["selected_preset"])
+                    except Exception:
+                        pass
+            
+            # Update UI after loading settings
+            self.on_mode_change()
+            
+        except Exception as e:
+            print(f"Failed to load configuration: {e}")
+    
+    def on_closing(self):
+        """Handle application closing (Task 34)"""
+        try:
+            # Save configuration before closing
+            self.save_configuration()
+            
+            # Close the application
+            self.root.destroy()
+            
+        except Exception as e:
+            print(f"Error during application closing: {e}")
+            self.root.destroy()
+    
     def run(self):
         """Start the GUI application"""
+        # Bind window closing event (Task 34)
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+        
         self.root.mainloop()
 
 
