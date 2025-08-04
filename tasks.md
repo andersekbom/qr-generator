@@ -142,3 +142,95 @@ Base file: `generate_qr_codes_gui_loop.py`
 **End**: Standardized test data available for development and testing  
 **Test**: Use sample data with application, verify correct processing  
 **Status**: ✅ Created comprehensive sample dataset with 7 new CSV files covering all delimiter types (comma, semicolon, tab, pipe) and various use cases (websites, contacts, WiFi, products, events, special characters, minimal data). Added input/README.md with detailed documentation and test_sample_data.py validation script. All 10 sample files pass validation testing, delimiter detection works correctly, QR generation successful for all samples. Supports testing of CSV parsing, column selection, header handling, Unicode characters, and performance scenarios.
+
+## GUI Modernization (v2.0)
+
+### Task 21: Create main window framework
+**Start**: Replace root.withdraw() with main window creation using tkinter  
+**End**: Main window displays with title, proper size, and basic layout structure  
+**Test**: Run application, verify main window appears instead of hidden window + dialogs  
+**New feature**: Replace dialog-based interface with modern main window GUI
+
+### Task 22: Implement operation mode selection panel
+**Start**: Create radio buttons or button panel for operation mode selection  
+**End**: User can select between "Single Generation", "Batch Sequential", "CSV Import" using buttons  
+**Test**: Click different operation modes, verify selection is captured correctly  
+**Replaces**: messagebox.askyesno("Operation Mode") and messagebox.askyesno("Batch Mode")
+
+### Task 23: Add preset management panel
+**Start**: Create preset section with dropdown and management buttons  
+**End**: User can load, save, delete presets using dropdown + buttons instead of dialogs  
+**Test**: Create preset, load preset, delete preset - all via GUI controls  
+**Replaces**: messagebox.askyesno("Presets") and preset management dialogs
+
+### Task 24: Implement CSV file selection widget
+**Start**: Add file selection section with browse button and path display  
+**End**: User can select CSV file via button, see selected file path in widget  
+**Test**: Click browse, select CSV file, verify path displays correctly  
+**Replaces**: filedialog.askopenfilename() in CSV mode
+
+### Task 25: Create parameter input forms
+**Start**: Add form sections for manual parameter input (uses, volume, date, etc.)  
+**End**: Text fields and dropdowns for all manual parameters with validation  
+**Test**: Enter parameters in form, verify validation works and values are captured  
+**Replaces**: simpledialog.askstring() calls for manual parameters
+
+### Task 26: Add format and advanced options panel
+**Start**: Create collapsible section for format selection and advanced QR options  
+**End**: Format radio buttons, quality/precision sliders, QR parameter controls  
+**Test**: Change format, verify format-specific options appear/hide correctly  
+**Replaces**: format selection dialogs and advanced parameter dialogs
+
+### Task 27: Implement filename customization section
+**Start**: Add filename options with prefix/suffix fields and checkboxes  
+**End**: User can configure filename patterns via form controls  
+**Test**: Change filename options, verify custom naming works correctly  
+**Replaces**: filename customization dialogs
+
+### Task 28: Create output configuration panel
+**Start**: Add output directory selection and zip options  
+**End**: Directory browse button, zip checkbox, cleanup options in main window  
+**Test**: Select output directory, toggle zip option, verify settings work  
+**Replaces**: output directory and zip file dialogs
+
+### Task 29: Add progress and status display
+**Start**: Create progress bar and status text area in main window  
+**End**: Progress bar shows generation progress, status area shows messages  
+**Test**: Generate QR codes, verify progress bar updates and status messages appear  
+**Replaces**: tqdm console progress bar and messagebox info/error dialogs
+
+### Task 30: Implement main window workflow integration
+**Start**: Connect all GUI components to existing backend functions  
+**End**: Main window controls trigger QR generation with all existing functionality  
+**Test**: Complete workflow from parameter entry to QR generation works via GUI  
+**Integration**: All 103 current dialog interactions replaced with main window controls
+
+### Task 31: Add CSV preview and column selection
+**Start**: Create CSV preview table and column selection controls  
+**End**: User can preview CSV data and select columns via table interface  
+**Test**: Load CSV file, verify preview shows data and column selection works  
+**Replaces**: simpledialog.askinteger() for column selection and CSV parameter dialogs
+
+### Task 32: Create generation results viewer
+**Start**: Add results panel showing generated files with thumbnails  
+**End**: User can see generated QR codes, file names, and access files  
+**Test**: Generate QR codes, verify results panel shows thumbnails and file info  
+**Enhancement**: Visual feedback for generation results not available in dialog version
+
+### Task 33: Add keyboard shortcuts and menu bar
+**Start**: Implement File/Edit/Help menu and keyboard shortcuts  
+**End**: Standard application menus with shortcuts (Ctrl+O, Ctrl+S, F1, etc.)  
+**Test**: Use keyboard shortcuts and menu items, verify all functions work  
+**Enhancement**: Professional application interface with standard UI conventions
+
+### Task 34: Implement configuration persistence
+**Start**: Save/restore window size, position, and user preferences  
+**End**: Application remembers last used settings and window configuration  
+**Test**: Change settings, restart app, verify settings are restored  
+**Enhancement**: Improved user experience with persistent configuration
+
+### Task 35: Add application icon and branding
+**Start**: Create application icon and add branding elements  
+**End**: Window has custom icon, about dialog, professional appearance  
+**Test**: Check window icon, about dialog, overall visual consistency  
+**Enhancement**: Professional application appearance and branding
