@@ -39,6 +39,9 @@ test_output/
 *.swp
 *.swo
 
+# Claude Code exports
+*.txt
+
 # OS
 .DS_Store
 Thumbs.db
