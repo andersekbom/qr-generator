@@ -15,489 +15,36 @@ import json
 import PIL
 from PIL import Image, ImageDraw
 
+# Import validation functions from separate module
+from src.validation import (
+    validate_integer_input, validate_date_format, validate_color_format,
+    validate_format, validate_qr_version, validate_error_correction,
+    validate_png_quality, validate_svg_precision, get_error_correction_level
+)
 
-def validate_integer_input(value, field_name, min_value=1, max_value=None):
-    """Validate integer input with range checking"""
-    try:
-        int_value = int(value)
-        if int_value < min_value:
-            return False, f"{field_name} must be at least {min_value}"
-        if max_value is not None and int_value > max_value:
-            return False, f"{field_name} must be at most {max_value}"
-        return True, int_value
-    except (ValueError, TypeError):
-        return False, f"{field_name} must be a valid number"
+# Import preset management functions from separate module  
+from src.preset_manager import (
+    get_presets_dir, save_preset, load_preset, list_presets, delete_preset,
+    create_manual_mode_preset, create_csv_mode_preset, show_preset_menu
+)
 
-def validate_date_format(date_str):
-    """Validate date format (DD.MM.YY)"""
-    if not date_str:
-        return False, "Date cannot be empty"
-    
-    # Check basic format
-    if not re.match(r'^\d{2}\.\d{2}\.\d{2}$', date_str):
-        return False, "Date must be in DD.MM.YY format (e.g., 26.12.31)"
-    
-    try:
-        # Parse and validate the date
-        day, month, year = map(int, date_str.split('.'))
-        
-        # Add 2000 to year for proper datetime validation
-        full_year = 2000 + year
-        datetime(full_year, month, day)
-        
-        return True, date_str
-    except ValueError:
-        return False, "Invalid date. Please check day, month values."
+# Import QR generation core functions from separate module
+from src.qr_core import (
+    generate_custom_filename, create_qr_codes, colorize_svg
+)
 
-def validate_color_format(color_str):
-    """Validate color format (hex or CSS color name)"""
-    if not color_str:
-        return False, "Color cannot be empty"
-    
-    # Check hex format
-    if color_str.startswith('#'):
-        if len(color_str) not in [4, 7]:  # #RGB or #RRGGBB
-            return False, "Hex color must be #RGB or #RRGGBB format"
-        try:
-            int(color_str[1:], 16)
-            return True, color_str
-        except ValueError:
-            return False, "Invalid hex color format"
-    
-    # Allow common CSS color names
-    css_colors = {
-        'black', 'white', 'red', 'green', 'blue', 'yellow', 'cyan', 'magenta',
-        'silver', 'gray', 'maroon', 'olive', 'lime', 'aqua', 'teal', 'navy',
-        'fuchsia', 'purple', 'orange', 'brown', 'pink', 'gold'
-    }
-    
-    if color_str.lower() in css_colors:
-        return True, color_str
-    
-    return False, "Color must be hex format (#RGB or #RRGGBB) or CSS color name"
+# Import file operations from separate module
+from src.file_utils import (
+    detect_delimiter, zip_output_files, clean_output_folder
+)
 
-def validate_format(format_str):
-    """Validate output format"""
-    if not format_str:
-        return False, "Format cannot be empty"
-    
-    valid_formats = ['png', 'svg']
-    if format_str.lower() not in valid_formats:
-        return False, f"Format must be one of: {', '.join(valid_formats)}"
-    
-    return True, format_str.lower()
+# Import GUI configuration, widget factory, and results viewer
+from src.gui_config import GUIConfig, WidgetFactory
+from src.results_viewer import ResultsViewer
 
-def validate_qr_version(version_str):
-    """Validate QR code version"""
-    if not version_str or version_str.lower() == 'auto':
-        return True, None
-    
-    try:
-        version = int(version_str)
-        if 1 <= version <= 40:
-            return True, version
-        else:
-            return False, "QR version must be between 1 and 40, or 'auto'"
-    except ValueError:
-        return False, "QR version must be a number between 1-40 or 'auto'"
 
-def validate_error_correction(level_str):
-    """Validate error correction level"""
-    if not level_str:
-        return False, "Error correction level cannot be empty"
-    
-    valid_levels = ['L', 'M', 'Q', 'H']
-    if level_str.upper() not in valid_levels:
-        return False, f"Error correction must be one of: {', '.join(valid_levels)}"
-    
-    return True, level_str.upper()
 
-def validate_png_quality(quality_str):
-    """Validate PNG quality setting"""
-    if not quality_str:
-        return False, "PNG quality cannot be empty"
-    
-    try:
-        quality = int(quality_str)
-        if quality < 0 or quality > 100:
-            return False, "PNG quality must be between 0 and 100"
-        return True, quality
-    except ValueError:
-        return False, "PNG quality must be a valid number"
 
-def validate_svg_precision(precision_str):
-    """Validate SVG precision setting"""
-    if not precision_str:
-        return False, "SVG precision cannot be empty"
-    
-    try:
-        precision = int(precision_str)
-        if precision < 0 or precision > 10:
-            return False, "SVG precision must be between 0 and 10"
-        return True, precision
-    except ValueError:
-        return False, "SVG precision must be a valid number"
-
-def get_error_correction_level(level_str):
-    """Convert error correction string to qrcode constant"""
-    levels = {
-        'L': qrcode.constants.ERROR_CORRECT_L,
-        'M': qrcode.constants.ERROR_CORRECT_M,
-        'Q': qrcode.constants.ERROR_CORRECT_Q,
-        'H': qrcode.constants.ERROR_CORRECT_H
-    }
-    return levels.get(level_str.upper(), qrcode.constants.ERROR_CORRECT_L)
-
-def get_presets_dir():
-    """Get or create the presets directory"""
-    presets_dir = os.path.join(os.getcwd(), "presets")
-    os.makedirs(presets_dir, exist_ok=True)
-    return presets_dir
-
-def save_preset(preset_name, parameters):
-    """Save parameter preset to JSON file"""
-    try:
-        presets_dir = get_presets_dir()
-        preset_file = os.path.join(presets_dir, f"{preset_name}.json")
-        
-        with open(preset_file, 'w') as f:
-            json.dump(parameters, f, indent=2)
-        
-        return True, f"Preset '{preset_name}' saved successfully"
-    except Exception as e:
-        return False, f"Failed to save preset: {e}"
-
-def load_preset(preset_name):
-    """Load parameter preset from JSON file"""
-    try:
-        presets_dir = get_presets_dir()
-        preset_file = os.path.join(presets_dir, f"{preset_name}.json")
-        
-        if not os.path.exists(preset_file):
-            return False, f"Preset '{preset_name}' not found"
-        
-        with open(preset_file, 'r') as f:
-            parameters = json.load(f)
-        
-        return True, parameters
-    except Exception as e:
-        return False, f"Failed to load preset: {e}"
-
-def list_presets():
-    """List all available presets"""
-    try:
-        presets_dir = get_presets_dir()
-        preset_files = [f for f in os.listdir(presets_dir) if f.endswith('.json')]
-        preset_names = [os.path.splitext(f)[0] for f in preset_files]
-        return preset_names
-    except Exception:
-        return []
-
-def delete_preset(preset_name):
-    """Delete a parameter preset"""
-    try:
-        presets_dir = get_presets_dir()
-        preset_file = os.path.join(presets_dir, f"{preset_name}.json")
-        
-        if not os.path.exists(preset_file):
-            return False, f"Preset '{preset_name}' not found"
-        
-        os.remove(preset_file)
-        return True, f"Preset '{preset_name}' deleted successfully"
-    except Exception as e:
-        return False, f"Failed to delete preset: {e}"
-
-def create_manual_mode_preset(valid_uses, volume, end_date, color, format, security_code, suffix_code, qr_version=None, error_correction="L", box_size=10, border=4, filename_prefix="", filename_suffix="", use_payload_as_filename=True, png_quality=85, svg_precision=2):
-    """Create preset dictionary for manual mode parameters"""
-    return {
-        "mode": "manual",
-        "valid_uses": valid_uses,
-        "volume": volume,
-        "end_date": end_date,
-        "color": color,
-        "format": format,
-        "security_code": security_code,
-        "suffix_code": suffix_code,
-        "qr_version": qr_version,
-        "error_correction": error_correction,
-        "box_size": box_size,
-        "border": border,
-        "filename_prefix": filename_prefix,
-        "filename_suffix": filename_suffix,
-        "use_payload_as_filename": use_payload_as_filename,
-        "png_quality": png_quality,
-        "svg_precision": svg_precision
-    }
-
-def create_csv_mode_preset(format, color, qr_version=None, error_correction="L", box_size=10, border=4, filename_prefix="", filename_suffix="", use_payload_as_filename=True, delimiter=",", input_column=0, skip_first_row=False, png_quality=85, svg_precision=2):
-    """Create preset dictionary for CSV mode parameters"""
-    return {
-        "mode": "csv",
-        "format": format,
-        "color": color,
-        "qr_version": qr_version,
-        "error_correction": error_correction,
-        "box_size": box_size,
-        "border": border,
-        "filename_prefix": filename_prefix,
-        "filename_suffix": filename_suffix,
-        "use_payload_as_filename": use_payload_as_filename,
-        "delimiter": delimiter,
-        "input_column": input_column,
-        "skip_first_row": skip_first_row,
-        "png_quality": png_quality,
-        "svg_precision": svg_precision
-    }
-
-def show_preset_menu():
-    """Show preset management menu and return user choice"""
-    available_presets = list_presets()
-    preset_list = "\n".join([f"- {name}" for name in available_presets]) if available_presets else "No presets available"
-    
-    menu_text = f"""Preset Management:
-
-Available presets:
-{preset_list}
-
-Choose action:
-1. Load preset
-2. Save current parameters as preset
-3. Delete preset
-4. Continue without presets"""
-    
-    choice = simpledialog.askstring("Preset Management", menu_text + "\n\nEnter choice (1-4):")
-    return choice, available_presets
-
-def generate_custom_filename(base_name, prefix="", suffix="", use_payload_as_base=True, index=None):
-    """Generate custom filename with optional prefix/suffix"""
-    if use_payload_as_base:
-        # Create safe filename from payload/base_name
-        safe_base = "".join(c for c in base_name if c.isalnum() or c in (' ', '-', '_', '.')).rstrip('.')
-        if not safe_base:
-            safe_base = f"qr_code_{index}" if index is not None else "qr_code"
-    else:
-        # Use index-based naming
-        safe_base = f"qr_code_{index}" if index is not None else "qr_code"
-    
-    # Combine prefix, base, and suffix
-    filename_parts = []
-    if prefix:
-        filename_parts.append(prefix)
-    filename_parts.append(safe_base)
-    if suffix:
-        filename_parts.append(suffix)
-    
-    return "_".join(filename_parts)
-
-def detect_delimiter(file_path):
-    with open(file_path, "r") as infile:
-        sample = infile.read(1024)
-        return csv.Sniffer().sniff(sample).delimiter
-
-def create_qr_codes(valid_uses, volume, end_date, color, output_folder, format, count, csv_data=None, input_column=0, security_code="SECD", suffix_code="23FF45EE", qr_version=None, error_correction="L", box_size=10, border=4, filename_prefix="", filename_suffix="", use_payload_as_filename=True, png_quality=85, svg_precision=2):
-    """
-    Create QR codes either from manual parameters or CSV data
-    
-    Args:
-        csv_data: List of CSV rows (None for manual mode)
-        input_column: Column index to use from CSV data
-        security_code: Security code to include in payload (default: "SECD")
-        suffix_code: Suffix code to include in payload (default: "23FF45EE")
-        qr_version: QR code version (1-40, None for auto)
-        error_correction: Error correction level (L, M, Q, H)
-        box_size: Size of each QR code box in pixels
-        border: Border size in boxes
-        filename_prefix: Prefix to add to generated filenames
-        filename_suffix: Suffix to add to generated filenames (before extension)
-        use_payload_as_filename: Whether to use payload content as filename base
-        png_quality: Quality setting for PNG images (0-100, higher is better quality)
-        svg_precision: Decimal precision for SVG coordinates
-        Other parameters: Used for manual mode or as defaults
-    """
-    os.makedirs(output_folder, exist_ok=True)
-    factory = qrcode.image.svg.SvgFillImage if format == 'svg' else None
-    
-    # Get error correction level
-    error_correction_level = get_error_correction_level(error_correction)
-
-    if csv_data is not None:
-        # CSV mode: generate QR codes from CSV data
-        for i, row in enumerate(tqdm(csv_data, desc="Generating QR codes from CSV")):
-            if len(row) <= input_column:
-                print(f"Warning: Row {i+1} doesn't have column {input_column}, skipping")
-                continue
-            
-            payload = row[input_column]
-            qr = qrcode.QRCode(
-                version=qr_version,
-                error_correction=error_correction_level,
-                box_size=box_size,
-                border=border,
-            )
-            qr.add_data(payload, optimize=0)
-            qr.make(fit=True)
-
-            img = qr.make_image(fill_color=color, back_color="#FFFFFF", image_factory=factory)
-
-            # Generate custom filename
-            custom_filename = generate_custom_filename(
-                payload, filename_prefix, filename_suffix, 
-                use_payload_as_filename, i+1
-            )
-            filename = os.path.join(output_folder, f"{custom_filename}.{format}")
-            
-            if format == 'png':
-                # Apply PNG quality settings
-                img.save(filename, "PNG", optimize=True, quality=png_quality)
-            elif format == 'svg':
-                img.save(filename)
-                colorize_svg(filename, color, svg_precision=svg_precision)
-            else:
-                img.save(filename)
-    else:
-        # Manual mode: generate QR codes with sequential serials
-        for i in tqdm(range(1, count + 1), desc="Generating QR codes"):
-            serial = f"{i:08d}"
-            payload = f"M-{valid_uses}-{serial}-{volume}-{end_date}-{security_code}-{suffix_code}"
-            qr = qrcode.QRCode(
-                version=qr_version,
-                error_correction=error_correction_level,
-                box_size=box_size,
-                border=border,
-            )
-            qr.add_data(payload, optimize=0)
-            qr.make(fit=True)
-
-            img = qr.make_image(fill_color=color, back_color="#000000", image_factory=factory)
-
-            # Generate custom filename
-            custom_filename = generate_custom_filename(
-                payload, filename_prefix, filename_suffix, 
-                use_payload_as_filename, i
-            )
-            filename = os.path.join(output_folder, f"{custom_filename}.{format}")
-            
-            if format == 'png':
-                # Apply PNG quality settings
-                img.save(filename, "PNG", optimize=True, quality=png_quality)
-            elif format == 'svg':
-                img.save(filename)
-                colorize_svg(filename, color, svg_precision=svg_precision)
-            else:
-                img.save(filename)
-    
-    # Return the output folder path for results display
-    return output_folder
-
-def zip_output_files(output_folder, zip_file_name, format):
-    with zipfile.ZipFile(zip_file_name, 'w', zipfile.ZIP_DEFLATED) as zipf:
-        for root, _, files in os.walk(output_folder):
-            for file in files:
-                if file.endswith(f".{format}"):
-                    zipf.write(os.path.join(root, file), arcname=file)
-    #messagebox.showinfo("Success", f"Output files added to zip file '{zip_file_name}' successfully!")
-
-def colorize_svg(svg_file, color, background_color="#FFFFFF", svg_precision=2):
-    """
-    Colorize SVG using proper XML manipulation with namespace handling.
-    
-    Args:
-        svg_file (str): Path to SVG file
-        color (str): Foreground color for QR code modules
-        background_color (str): Background color (default white)
-        svg_precision (int): Decimal precision for SVG coordinates
-    """
-    try:
-        # Read the SVG file
-        with open(svg_file, 'r') as file:
-            svg_content = file.read()
-        
-        # Parse the SVG string with XML
-        try:
-            root = ET.fromstring(svg_content)
-        except ET.ParseError as e:
-            print(f"Warning: Could not parse SVG as XML ({e}), falling back to regex method")
-            # Fallback to original regex method if XML parsing fails
-            colored_svg = re.sub(r'fill="[^"]+"', f'fill="{color}"', svg_content)
-            with open(svg_file, 'w') as file:
-                file.write(colored_svg)
-            return
-        
-        # Register SVG namespace to handle namespace prefixes properly
-        ET.register_namespace('svg', 'http://www.w3.org/2000/svg')
-        namespace = "{http://www.w3.org/2000/svg}"
-        
-        # Track if we modified anything
-        modified = False
-        
-        # Find and color path elements (for path-based QR codes)
-        path_elements = root.findall(f".//{namespace}path")
-        if not path_elements:
-            path_elements = root.findall(".//path")  # Try without namespace
-        
-        for path_element in path_elements:
-            path_element.set("fill", color)
-            modified = True
-        
-        # Find and color rect elements (for rect-based QR codes like SvgFillImage)
-        rect_elements = root.findall(f".//{namespace}rect")
-        if not rect_elements:
-            rect_elements = root.findall(".//rect")  # Try without namespace
-        
-        # The first rect is usually the background, others are QR modules
-        for i, rect_element in enumerate(rect_elements):
-            if i == 0:
-                # First rect is typically the background
-                rect_element.set("fill", background_color)
-            else:
-                # Other rects are QR code modules
-                rect_element.set("fill", color)
-            modified = True
-        
-        if not modified:
-            print("Warning: Could not find path or rect elements in SVG. Falling back to regex method.")
-            # Fallback to regex if no elements found
-            colored_svg = re.sub(r'fill="[^"]+"', f'fill="{color}"', svg_content)
-            with open(svg_file, 'w') as file:
-                file.write(colored_svg)
-            return
-        
-        # Write the modified SVG back to file
-        modified_svg_string = ET.tostring(root, encoding='unicode')
-        
-        # Apply precision formatting to numeric values in SVG
-        if svg_precision < 10:  # Only apply precision formatting if it's reasonable
-            # Format decimal numbers to specified precision
-            def format_number(match):
-                number = float(match.group())
-                return f"{number:.{svg_precision}f}"
-            
-            # Match decimal numbers (including integers that could be formatted)
-            modified_svg_string = re.sub(r'\b\d+\.\d+\b', format_number, modified_svg_string)
-        
-        # Ensure proper SVG declaration if missing
-        if not modified_svg_string.startswith('<?xml'):
-            modified_svg_string = '<?xml version="1.0" encoding="UTF-8"?>\n' + modified_svg_string
-        
-        with open(svg_file, 'w') as file:
-            file.write(modified_svg_string)
-            
-    except Exception as e:
-        print(f"Warning: Error in XML-based SVG colorization ({e}), falling back to regex method")
-        # Fallback to original regex method if anything goes wrong
-        try:
-            with open(svg_file, 'r') as file:
-                svg_content = file.read()
-            colored_svg = re.sub(r'fill="[^"]+"', f'fill="{color}"', svg_content)
-            with open(svg_file, 'w') as file:
-                file.write(colored_svg)
-        except Exception as fallback_error:
-            print(f"Error: Both XML and regex colorization methods failed: {fallback_error}")
-
-def clean_output_folder(output_folder):
-    for root, _, files in os.walk(output_folder):
-        for file in files:
-            os.remove(os.path.join(root, file))
 
 
 class QRGeneratorGUI:
@@ -505,14 +52,17 @@ class QRGeneratorGUI:
     
     def __init__(self):
         # Set CustomTkinter appearance mode and color theme
-        ctk.set_appearance_mode("system")  # Modes: "system", "dark", "light"
-        ctk.set_default_color_theme("blue")  # Themes: "blue", "green", "dark-blue"
+        ctk.set_appearance_mode(GUIConfig.APPEARANCE_MODE)
+        ctk.set_default_color_theme(GUIConfig.COLOR_THEME)
         
         # Create main window
         self.root = ctk.CTk()
-        self.root.title("QR Generator v2.0")
-        self.root.geometry("900x700")
-        self.root.minsize(800, 600)
+        self.root.title("QR Generator Pro - Professional QR Code Generation Tool")
+        self.root.geometry(f"{GUIConfig.WINDOW_WIDTH}x{GUIConfig.WINDOW_HEIGHT}")
+        self.root.minsize(GUIConfig.MIN_WIDTH, GUIConfig.MIN_HEIGHT)
+        
+        # Initialize fonts after root window is created
+        GUIConfig.init_fonts()
         
         # Center window on screen
         self.center_window()
@@ -668,18 +218,52 @@ class QRGeneratorGUI:
             print(f"Keyboard shortcuts setup failed: {e}")
     
     def create_header_section(self):
-        """Create header with title and theme toggle"""
+        """Create header with title and theme toggle (Task 35 - Branding)"""
         header_frame = ctk.CTkFrame(self.root)
-        header_frame.grid(row=0, column=0, sticky="ew", padx=20, pady=(20, 10))
-        header_frame.grid_columnconfigure(1, weight=1)
+        header_frame.grid(row=0, column=0, sticky=GUIConfig.STICKY_EW, 
+                         padx=GUIConfig.CONTENT_PADX, pady=(GUIConfig.CONTENT_PADX, 10))
+        header_frame.grid_columnconfigure(2, weight=1)
         
-        # Title
-        title_label = ctk.CTkLabel(
-            header_frame, 
-            text="QR Code Generator", 
-            font=ctk.CTkFont(size=24, weight="bold")
+        # App icon (if available)
+        try:
+            if os.path.exists('icon_32.png'):
+                icon_image = tk.PhotoImage(file='icon_32.png')
+                icon_label = ctk.CTkLabel(header_frame, image=icon_image, text="")
+                icon_label.image = icon_image  # Keep a reference
+                icon_label.grid(row=0, column=0, padx=GUIConfig.CONTENT_PADX, 
+                               pady=GUIConfig.CONTENT_PADY, sticky=GUIConfig.STICKY_W)
+        except Exception:
+            pass
+        
+        # Title with branding
+        title_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
+        title_frame.grid(row=0, column=1, padx=GUIConfig.CONTENT_PADX, 
+                        pady=GUIConfig.CONTENT_PADY, sticky=GUIConfig.STICKY_W)
+        
+        main_title = ctk.CTkLabel(
+            title_frame,
+            text="QR Generator Pro",
+            font=GUIConfig.TITLE_FONT
         )
-        title_label.grid(row=0, column=0, padx=20, pady=15, sticky="w")
+        main_title.grid(row=0, column=0, sticky=GUIConfig.STICKY_W)
+        
+        subtitle = ctk.CTkLabel(
+            title_frame,
+            text="Professional QR Code Generation Tool",
+            font=GUIConfig.SMALL_FONT,
+            text_color="gray"
+        )
+        subtitle.grid(row=1, column=0, sticky=GUIConfig.STICKY_W)
+        
+        # Version info
+        version_label = ctk.CTkLabel(
+            header_frame,
+            text="v2.0",
+            font=GUIConfig.TINY_FONT,
+            text_color="gray"
+        )
+        version_label.grid(row=0, column=3, padx=(0, 10), pady=GUIConfig.CONTENT_PADY, 
+                          sticky="ne")
         
         # Theme toggle button
         theme_button = ctk.CTkButton(
@@ -688,7 +272,8 @@ class QRGeneratorGUI:
             width=50,
             command=self.toggle_theme
         )
-        theme_button.grid(row=0, column=2, padx=20, pady=15, sticky="e")
+        theme_button.grid(row=0, column=4, padx=GUIConfig.CONTENT_PADX, 
+                         pady=GUIConfig.CONTENT_PADY, sticky=GUIConfig.STICKY_E)
     
     def create_content_area(self):
         """Create scrollable content area for all settings"""
@@ -728,64 +313,8 @@ class QRGeneratorGUI:
     
     def create_results_viewer_section(self):
         """Create generation results viewer with thumbnails (Task 32)"""
-        self.results_frame = ctk.CTkFrame(self.content_frame)
-        self.results_frame.grid(row=7, column=0, sticky="ew", padx=10, pady=10)
-        self.results_frame.grid_columnconfigure(0, weight=1)
-        
-        # Section title
-        self.results_title = ctk.CTkLabel(
-            self.results_frame,
-            text="Generation Results:",
-            font=ctk.CTkFont(weight="bold", size=16)
-        )
-        self.results_title.grid(row=0, column=0, padx=20, pady=(15, 10), sticky="w")
-        
-        # Results summary
-        self.results_summary = ctk.CTkLabel(
-            self.results_frame,
-            text="No QR codes generated yet",
-            font=ctk.CTkFont(size=12),
-            text_color="gray"
-        )
-        self.results_summary.grid(row=1, column=0, padx=20, pady=5, sticky="w")
-        
-        # Scrollable frame for thumbnails
-        self.thumbnails_frame = ctk.CTkScrollableFrame(
-            self.results_frame,
-            height=200,
-            orientation="horizontal"
-        )
-        self.thumbnails_frame.grid(row=2, column=0, padx=20, pady=10, sticky="ew")
-        
-        # Action buttons
-        buttons_frame = ctk.CTkFrame(self.results_frame)
-        buttons_frame.grid(row=3, column=0, padx=20, pady=(0, 15), sticky="ew")
-        buttons_frame.grid_columnconfigure(0, weight=1)
-        
-        # Open folder button
-        self.open_folder_btn = ctk.CTkButton(
-            buttons_frame,
-            text="Open Output Folder",
-            width=150,
-            command=self.open_output_folder,
-            state="disabled"
-        )
-        self.open_folder_btn.grid(row=0, column=0, padx=10, pady=10, sticky="w")
-        
-        # Clear results button
-        self.clear_results_btn = ctk.CTkButton(
-            buttons_frame,
-            text="Clear Results",
-            width=120,
-            command=self.clear_results,
-            fg_color="gray",
-            hover_color="darkgray",
-            state="disabled"
-        )
-        self.clear_results_btn.grid(row=0, column=1, padx=10, pady=10, sticky="w")
-        
-        # Initially hide the results section
-        self.results_frame.grid_remove()
+        # Initialize the ResultsViewer component
+        self.results_viewer = ResultsViewer(self.content_frame, self)
     
     def create_footer_section(self):
         """Create footer with main action buttons"""
@@ -814,16 +343,9 @@ class QRGeneratorGUI:
     
     def create_operation_mode_section(self):
         """Create operation mode selection with clear radio buttons (Task 22)"""
-        mode_frame = ctk.CTkFrame(self.content_frame)
-        mode_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
-        mode_frame.grid_columnconfigure(1, weight=1)
-        
-        # Section title
-        ctk.CTkLabel(
-            mode_frame, 
-            text="Generation Mode:", 
-            font=ctk.CTkFont(weight="bold", size=16)
-        ).grid(row=0, column=0, columnspan=3, padx=20, pady=(15, 10), sticky="w")
+        mode_frame, _ = WidgetFactory.create_section(
+            self.content_frame, "Generation Mode:", 0, {1: 1}
+        )
         
         # Radio buttons for operation modes
         self.mode_manual = ctk.CTkRadioButton(
@@ -851,16 +373,9 @@ class QRGeneratorGUI:
     
     def create_preset_management_section(self):
         """Create preset management with dropdown and buttons (Task 23)"""
-        preset_frame = ctk.CTkFrame(self.content_frame)
-        preset_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=10)
-        preset_frame.grid_columnconfigure(1, weight=1)
-        
-        # Section title
-        ctk.CTkLabel(
-            preset_frame, 
-            text="Parameter Presets:", 
-            font=ctk.CTkFont(weight="bold", size=16)
-        ).grid(row=0, column=0, columnspan=4, padx=20, pady=(15, 10), sticky="w")
+        preset_frame, _ = WidgetFactory.create_section(
+            self.content_frame, "Parameter Presets:", 1, {1: 1}
+        )
         
         # Preset dropdown
         self.preset_dropdown = ctk.CTkComboBox(
@@ -986,16 +501,9 @@ class QRGeneratorGUI:
     
     def create_csv_file_section(self):
         """Create CSV file selection widget with browse button (Task 24)"""
-        self.csv_frame = ctk.CTkFrame(self.content_frame)
-        self.csv_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=10)
-        self.csv_frame.grid_columnconfigure(1, weight=1)
-        
-        # Section title
-        ctk.CTkLabel(
-            self.csv_frame, 
-            text="CSV File Selection:", 
-            font=ctk.CTkFont(weight="bold", size=16)
-        ).grid(row=0, column=0, columnspan=3, padx=20, pady=(15, 10), sticky="w")
+        self.csv_frame, _ = WidgetFactory.create_section(
+            self.content_frame, "CSV File Selection:", 2, {1: 1}
+        )
         
         # File path display
         self.csv_path_entry = ctk.CTkEntry(
@@ -1315,17 +823,9 @@ class QRGeneratorGUI:
     
     def create_parameter_forms_section(self):
         """Create parameter input forms with validation (Task 25)"""
-        self.params_frame = ctk.CTkFrame(self.content_frame)
-        self.params_frame.grid(row=3, column=0, sticky="ew", padx=10, pady=10)
-        self.params_frame.grid_columnconfigure(1, weight=1)
-        self.params_frame.grid_columnconfigure(3, weight=1)
-        
-        # Section title
-        ctk.CTkLabel(
-            self.params_frame, 
-            text="QR Code Parameters:", 
-            font=ctk.CTkFont(weight="bold", size=16)
-        ).grid(row=0, column=0, columnspan=4, padx=20, pady=(15, 10), sticky="w")
+        self.params_frame, _ = WidgetFactory.create_section(
+            self.content_frame, "QR Code Parameters:", 3, {1: 1, 3: 1}
+        )
         
         # Row 1: Valid Uses and Volume
         ctk.CTkLabel(self.params_frame, text="Valid Uses:", font=ctk.CTkFont(size=12)).grid(
@@ -1500,17 +1000,9 @@ class QRGeneratorGUI:
     
     def create_format_options_section(self):
         """Create format and advanced options panel (Task 26)"""
-        self.format_frame = ctk.CTkFrame(self.content_frame)
-        self.format_frame.grid(row=4, column=0, sticky="ew", padx=10, pady=10)
-        self.format_frame.grid_columnconfigure(1, weight=1)
-        self.format_frame.grid_columnconfigure(3, weight=1)
-        
-        # Section title
-        ctk.CTkLabel(
-            self.format_frame, 
-            text="Format & Advanced Options:", 
-            font=ctk.CTkFont(weight="bold", size=16)
-        ).grid(row=0, column=0, columnspan=4, padx=20, pady=(15, 10), sticky="w")
+        self.format_frame, _ = WidgetFactory.create_section(
+            self.content_frame, "Format & Advanced Options:", 4, {1: 1, 3: 1}
+        )
         
         # Format selection
         format_selection_frame = ctk.CTkFrame(self.format_frame)
@@ -1713,16 +1205,9 @@ class QRGeneratorGUI:
     
     def create_output_config_section(self):
         """Create output configuration panel (Task 28)"""
-        self.output_frame = ctk.CTkFrame(self.content_frame)
-        self.output_frame.grid(row=5, column=0, sticky="ew", padx=10, pady=10)
-        self.output_frame.grid_columnconfigure(1, weight=1)
-        
-        # Section title
-        ctk.CTkLabel(
-            self.output_frame, 
-            text="Output Configuration:", 
-            font=ctk.CTkFont(weight="bold", size=16)
-        ).grid(row=0, column=0, columnspan=4, padx=20, pady=(15, 10), sticky="w")
+        self.output_frame, _ = WidgetFactory.create_section(
+            self.content_frame, "Output Configuration:", 5, {1: 1}
+        )
         
         # Output directory selection
         output_dir_frame = ctk.CTkFrame(self.output_frame)
@@ -2067,7 +1552,7 @@ class QRGeneratorGUI:
             self.status_label.configure(text=f"✅ Generated {len(csv_data)} QR codes successfully!", text_color="green")
             
             # Display results (Task 32)
-            self.display_generation_results(result_folder, len(csv_data))
+            self.results_viewer.display_generation_results(result_folder, len(csv_data))
             
         except Exception as e:
             self.status_label.configure(text=f"Error processing CSV: {str(e)}", text_color="red")
@@ -2122,7 +1607,7 @@ class QRGeneratorGUI:
                 self.status_label.configure(text=f"✅ Generated {count} QR codes successfully!", text_color="green")
             
             # Display results (Task 32)
-            self.display_generation_results(result_folder, count)
+            self.results_viewer.display_generation_results(result_folder, count)
             
         except Exception as e:
             self.status_label.configure(text=f"Error generating QR codes: {str(e)}", text_color="red")
@@ -2160,178 +1645,21 @@ class QRGeneratorGUI:
         except Exception as e:
             self.status_label.configure(text=f"Warning: Cleanup failed: {str(e)}", text_color="orange")
     
-    def display_generation_results(self, result_folder, file_count):
-        """Display generation results with thumbnails (Task 32)"""
-        try:
-            # Show results section
-            self.results_frame.grid()
-            
-            # Update summary
-            self.results_summary.configure(
-                text=f"Generated {file_count} QR code(s) in: {result_folder}",
-                text_color="green"
-            )
-            
-            # Clear existing thumbnails
-            for widget in self.thumbnails_frame.winfo_children():
-                widget.destroy()
-            
-            # Load thumbnails for PNG files only (SVG thumbnails are more complex)
-            png_files = []
-            if os.path.exists(result_folder):
-                for file in os.listdir(result_folder):
-                    if file.lower().endswith('.png'):
-                        png_files.append(os.path.join(result_folder, file))
-            
-            # Display thumbnails (limit to first 10 for performance)
-            for i, file_path in enumerate(png_files[:10]):
-                self.create_thumbnail(file_path, i)
-            
-            # Enable buttons
-            self.open_folder_btn.configure(state="normal")
-            self.clear_results_btn.configure(state="normal")
-            
-            # Store result folder for opening
-            self.last_result_folder = result_folder
-            
-        except Exception as e:
-            self.results_summary.configure(
-                text=f"Error displaying results: {str(e)}",
-                text_color="red"
-            )
     
-    def create_thumbnail(self, file_path, index):
-        """Create a thumbnail widget for a QR code file (Task 32)"""
-        try:
-            from PIL import Image, ImageTk
-            
-            # Create thumbnail frame
-            thumb_frame = ctk.CTkFrame(self.thumbnails_frame, width=120, height=140)
-            thumb_frame.grid(row=0, column=index, padx=5, pady=5)
-            thumb_frame.grid_propagate(False)
-            
-            # Load and resize image
-            image = Image.open(file_path)
-            image.thumbnail((80, 80), Image.Resampling.LANCZOS)
-            photo = ImageTk.PhotoImage(image)
-            
-            # Image label
-            image_label = tk.Label(
-                thumb_frame, 
-                image=photo,
-                bg=thumb_frame.cget("fg_color")[1]
-            )
-            image_label.image = photo  # Keep reference
-            image_label.pack(pady=(10, 5))
-            
-            # Filename label
-            filename = os.path.basename(file_path)
-            if len(filename) > 15:
-                filename = filename[:12] + "..."
-            
-            name_label = ctk.CTkLabel(
-                thumb_frame,
-                text=filename,
-                font=ctk.CTkFont(size=10)
-            )
-            name_label.pack(pady=(0, 5))
-            
-            # Click to open file
-            def open_file():
-                try:
-                    import subprocess
-                    import platform
-                    
-                    if platform.system() == "Darwin":  # macOS
-                        subprocess.call(["open", file_path])
-                    elif platform.system() == "Windows":
-                        os.startfile(file_path)
-                    else:  # Linux
-                        subprocess.call(["xdg-open", file_path])
-                except Exception:
-                    pass
-            
-            image_label.bind("<Button-1>", lambda e: open_file())
-            thumb_frame.bind("<Button-1>", lambda e: open_file())
-            
-        except ImportError:
-            # Fallback if PIL is not available
-            thumb_frame = ctk.CTkFrame(self.thumbnails_frame, width=120, height=140)
-            thumb_frame.grid(row=0, column=index, padx=5, pady=5)
-            
-            ctk.CTkLabel(
-                thumb_frame,
-                text="📄\nQR Code",
-                font=ctk.CTkFont(size=12)
-            ).pack(expand=True)
-            
-        except Exception as e:
-            # Error creating thumbnail
-            thumb_frame = ctk.CTkFrame(self.thumbnails_frame, width=120, height=140)
-            thumb_frame.grid(row=0, column=index, padx=5, pady=5)
-            
-            ctk.CTkLabel(
-                thumb_frame,
-                text="❌\nError",
-                font=ctk.CTkFont(size=12),
-                text_color="red"
-            ).pack(expand=True)
     
     def open_output_folder(self):
         """Open the output folder in file manager (Task 32)"""
-        try:
-            if hasattr(self, 'last_result_folder') and os.path.exists(self.last_result_folder):
-                import subprocess
-                import platform
-                
-                if platform.system() == "Darwin":  # macOS
-                    subprocess.call(["open", self.last_result_folder])
-                elif platform.system() == "Windows":
-                    os.startfile(self.last_result_folder)
-                else:  # Linux
-                    subprocess.call(["xdg-open", self.last_result_folder])
-            else:
-                self.results_summary.configure(
-                    text="Output folder no longer exists",
-                    text_color="orange"
-                )
-        except Exception as e:
-            self.results_summary.configure(
-                text=f"Error opening folder: {str(e)}",
-                text_color="red"
-            )
+        self.results_viewer.open_output_folder()
     
     def clear_results(self):
         """Clear the results display (Task 32)"""
-        try:
-            # Clear thumbnails
-            for widget in self.thumbnails_frame.winfo_children():
-                widget.destroy()
-            
-            # Reset labels
-            self.results_summary.configure(
-                text="No QR codes generated yet",
-                text_color="gray"
-            )
-            
-            # Disable buttons
-            self.open_folder_btn.configure(state="disabled")
-            self.clear_results_btn.configure(state="disabled")
-            
-            # Hide results section
-            self.results_frame.grid_remove()
-            
-        except Exception as e:
-            self.results_summary.configure(
-                text=f"Error clearing results: {str(e)}",
-                text_color="red"
-            )
+        self.results_viewer.clear_results()
     
     def new_session(self):
         """Start a new session by clearing all data (Task 33)"""
         try:
             self.clear_form()
-            self.clear_results()
+            self.results_viewer.clear_results()
             self.status_label.configure(text="New session started", text_color="blue")
         except Exception as e:
             self.status_label.configure(text=f"Error starting new session: {str(e)}", text_color="red")
