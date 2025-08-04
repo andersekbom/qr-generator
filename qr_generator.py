@@ -5,6 +5,7 @@ import os
 import zipfile
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog
+import customtkinter as ctk
 import re
 from tqdm import tqdm
 import xml.etree.ElementTree as ET
@@ -495,7 +496,183 @@ def clean_output_folder(output_folder):
         for file in files:
             os.remove(os.path.join(root, file))
 
+
+class QRGeneratorGUI:
+    """Modern GUI interface for QR Generator using CustomTkinter"""
+    
+    def __init__(self):
+        # Set CustomTkinter appearance mode and color theme
+        ctk.set_appearance_mode("system")  # Modes: "system", "dark", "light"
+        ctk.set_default_color_theme("blue")  # Themes: "blue", "green", "dark-blue"
+        
+        # Create main window
+        self.root = ctk.CTk()
+        self.root.title("QR Generator v2.0")
+        self.root.geometry("900x700")
+        self.root.minsize(800, 600)
+        
+        # Center window on screen
+        self.center_window()
+        
+        # Initialize GUI state variables
+        self.operation_mode = tk.StringVar(value="single")  # single, batch, csv
+        self.selected_preset = tk.StringVar(value="")
+        self.csv_file_path = tk.StringVar(value="")
+        
+        # Create main layout
+        self.create_main_layout()
+        
+        # Initialize with default values
+        self.init_default_values()
+    
+    def center_window(self):
+        """Center the main window on the screen"""
+        self.root.update_idletasks()
+        width = self.root.winfo_width()
+        height = self.root.winfo_height()
+        x = (self.root.winfo_screenwidth() // 2) - (width // 2)
+        y = (self.root.winfo_screenheight() // 2) - (height // 2)
+        self.root.geometry(f"{width}x{height}+{x}+{y}")
+    
+    def create_main_layout(self):
+        """Create the main window layout with sections"""
+        # Configure grid weights for responsive layout
+        self.root.grid_columnconfigure(0, weight=1)
+        self.root.grid_rowconfigure(1, weight=1)
+        
+        # Header section
+        self.create_header_section()
+        
+        # Main content area (scrollable)
+        self.create_content_area()
+        
+        # Footer with action buttons
+        self.create_footer_section()
+    
+    def create_header_section(self):
+        """Create header with title and theme toggle"""
+        header_frame = ctk.CTkFrame(self.root)
+        header_frame.grid(row=0, column=0, sticky="ew", padx=20, pady=(20, 10))
+        header_frame.grid_columnconfigure(1, weight=1)
+        
+        # Title
+        title_label = ctk.CTkLabel(
+            header_frame, 
+            text="QR Code Generator", 
+            font=ctk.CTkFont(size=24, weight="bold")
+        )
+        title_label.grid(row=0, column=0, padx=20, pady=15, sticky="w")
+        
+        # Theme toggle button
+        theme_button = ctk.CTkButton(
+            header_frame,
+            text="🌙/☀️",
+            width=50,
+            command=self.toggle_theme
+        )
+        theme_button.grid(row=0, column=2, padx=20, pady=15, sticky="e")
+    
+    def create_content_area(self):
+        """Create scrollable content area for all settings"""
+        # Create scrollable frame
+        self.content_frame = ctk.CTkScrollableFrame(self.root)
+        self.content_frame.grid(row=1, column=0, sticky="nsew", padx=20, pady=10)
+        self.content_frame.grid_columnconfigure(0, weight=1)
+        
+        # Placeholder sections (will be implemented in subsequent tasks)
+        self.create_placeholder_sections()
+    
+    def create_placeholder_sections(self):
+        """Create placeholder sections for development"""
+        # Operation Mode Section (Task 22)
+        mode_frame = ctk.CTkFrame(self.content_frame)
+        mode_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
+        mode_frame.grid_columnconfigure(1, weight=1)
+        
+        ctk.CTkLabel(mode_frame, text="Operation Mode:", font=ctk.CTkFont(weight="bold")).grid(
+            row=0, column=0, padx=20, pady=15, sticky="w")
+        ctk.CTkLabel(mode_frame, text="[Coming in Task 22]", text_color="gray").grid(
+            row=0, column=1, padx=20, pady=15, sticky="w")
+        
+        # Preset Management Section (Task 23)
+        preset_frame = ctk.CTkFrame(self.content_frame)
+        preset_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=10)
+        preset_frame.grid_columnconfigure(1, weight=1)
+        
+        ctk.CTkLabel(preset_frame, text="Presets:", font=ctk.CTkFont(weight="bold")).grid(
+            row=0, column=0, padx=20, pady=15, sticky="w")
+        ctk.CTkLabel(preset_frame, text="[Coming in Task 23]", text_color="gray").grid(
+            row=0, column=1, padx=20, pady=15, sticky="w")
+        
+        # Parameters Section (Task 25)
+        params_frame = ctk.CTkFrame(self.content_frame)
+        params_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=10)
+        params_frame.grid_columnconfigure(1, weight=1)
+        
+        ctk.CTkLabel(params_frame, text="Parameters:", font=ctk.CTkFont(weight="bold")).grid(
+            row=0, column=0, padx=20, pady=15, sticky="w")
+        ctk.CTkLabel(params_frame, text="[Coming in Task 25]", text_color="gray").grid(
+            row=0, column=1, padx=20, pady=15, sticky="w")
+    
+    def create_footer_section(self):
+        """Create footer with main action buttons"""
+        footer_frame = ctk.CTkFrame(self.root)
+        footer_frame.grid(row=2, column=0, sticky="ew", padx=20, pady=(10, 20))
+        footer_frame.grid_columnconfigure(1, weight=1)
+        
+        # Generate button
+        self.generate_button = ctk.CTkButton(
+            footer_frame,
+            text="Generate QR Codes",
+            font=ctk.CTkFont(size=16, weight="bold"),
+            height=40,
+            command=self.generate_qr_codes
+        )
+        self.generate_button.grid(row=0, column=2, padx=20, pady=15, sticky="e")
+        
+        # Status label
+        self.status_label = ctk.CTkLabel(
+            footer_frame,
+            text="Ready to generate QR codes",
+            text_color="gray"
+        )
+        self.status_label.grid(row=0, column=0, padx=20, pady=15, sticky="w")
+    
+    def init_default_values(self):
+        """Initialize default values for the form"""
+        # Set default operation mode
+        self.operation_mode.set("single")
+    
+    def toggle_theme(self):
+        """Toggle between light and dark themes"""
+        current_mode = ctk.get_appearance_mode()
+        new_mode = "light" if current_mode == "dark" else "dark"
+        ctk.set_appearance_mode(new_mode)
+    
+    def generate_qr_codes(self):
+        """Main action - generate QR codes (placeholder for Task 30)"""
+        self.status_label.configure(text="QR code generation coming in Task 30...")
+        # TODO: Implement in Task 30 - Main window workflow integration
+    
+    def run(self):
+        """Start the GUI application"""
+        self.root.mainloop()
+
+
 def main():
+    """Main entry point - now uses modern GUI instead of dialogs"""
+    try:
+        # Create and run the modern GUI
+        app = QRGeneratorGUI()
+        app.run()
+    except Exception as e:
+        # Fallback to old dialog-based interface if GUI fails
+        print(f"GUI initialization failed: {e}")
+        print("Falling back to dialog-based interface...")
+        main_legacy()
+
+
+def main_legacy():
     root = tk.Tk()
     root.withdraw()  # Hide the root window
 

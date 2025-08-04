@@ -11,6 +11,9 @@ colorama==0.4.6
 # Python Imaging Library for image processing
 pillow==11.3.0
 
+# Modern GUI framework (drop-in replacement for tkinter)
+customtkinter==5.2.2
+
 # Note: The following standard library modules are also used but don't require installation:
 # - tkinter (GUI dialogs - included with Python)
 # - csv (CSV file processing)

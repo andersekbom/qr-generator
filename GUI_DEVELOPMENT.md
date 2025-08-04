@@ -44,10 +44,13 @@
 5. **Maintain Functionality**: All existing features preserved
 
 ## Technical Approach
-- **Framework**: tkinter (maintain current dependency)
-- **Layout**: Grid-based layout with sections for different functionality
-- **Validation**: Real-time form validation instead of dialog validation
+- **Framework**: CustomTkinter 5.2.2 (modern drop-in replacement for tkinter)
+- **Layout**: CTk grid-based layout with modern styled sections
+- **Theming**: Built-in dark/light mode with professional appearance
+- **Widgets**: CTkButton, CTkEntry, CTkFrame, CTkProgressBar, etc.
+- **Validation**: Real-time form validation with styled error messages
 - **State Management**: GUI state drives backend function calls
+- **Migration**: Minimal code changes from tkinter to CustomTkinter
 - **Backward Compatibility**: Keep existing backend functions unchanged
 
 ## Development Notes
