@@ -515,7 +515,7 @@ class QRGeneratorGUI:
         self.center_window()
         
         # Initialize GUI state variables
-        self.operation_mode = tk.StringVar(value="single")  # single, batch, csv
+        self.operation_mode = tk.StringVar(value="manual")  # manual, csv
         self.selected_preset = tk.StringVar(value="")
         self.csv_file_path = tk.StringVar(value="")
         
@@ -673,25 +673,15 @@ class QRGeneratorGUI:
         ).grid(row=0, column=0, columnspan=3, padx=20, pady=(15, 10), sticky="w")
         
         # Radio buttons for operation modes
-        self.mode_single = ctk.CTkRadioButton(
+        self.mode_manual = ctk.CTkRadioButton(
             mode_frame,
-            text="Single Generation\nGenerate 1 or a few QR codes with same parameters",
+            text="Manual Generation\nGenerate QR codes with sequential serials (set count: 1 for single, multiple for batch)",
             variable=self.operation_mode,
-            value="single",
+            value="manual",
             font=ctk.CTkFont(size=12),
             command=self.on_mode_change
         )
-        self.mode_single.grid(row=1, column=0, padx=20, pady=5, sticky="w")
-        
-        self.mode_batch = ctk.CTkRadioButton(
-            mode_frame,
-            text="Batch Sequential Generation\nGenerate multiple QR codes with sequential numbering",
-            variable=self.operation_mode,
-            value="batch",
-            font=ctk.CTkFont(size=12),
-            command=self.on_mode_change
-        )
-        self.mode_batch.grid(row=1, column=1, padx=20, pady=5, sticky="w")
+        self.mode_manual.grid(row=1, column=0, padx=20, pady=5, sticky="w")
         
         self.mode_csv = ctk.CTkRadioButton(
             mode_frame,
@@ -701,7 +691,7 @@ class QRGeneratorGUI:
             font=ctk.CTkFont(size=12),
             command=self.on_mode_change
         )
-        self.mode_csv.grid(row=1, column=2, padx=20, pady=5, sticky="w")
+        self.mode_csv.grid(row=1, column=1, padx=20, pady=5, sticky="w")
         
         # Add some spacing
         mode_frame.grid_rowconfigure(2, minsize=15)
@@ -995,23 +985,12 @@ class QRGeneratorGUI:
             self.show_format_section(True)  # CSV mode also needs format options
             self.show_output_section(True)  # All modes need output options
             self.status_label.configure(text="CSV mode selected - choose a CSV file to import data")
-        else:
+        elif mode == "manual":
             self.show_csv_section(False)
             self.show_parameter_section(True)
-            self.show_format_section(True)  # Single/batch modes need format options
+            self.show_format_section(True)  # Manual mode needs format options
             self.show_output_section(True)  # All modes need output options
-            mode_names = {"single": "Single Generation", "batch": "Batch Sequential"}
-            self.status_label.configure(text=f"{mode_names[mode]} mode selected - enter QR code parameters")
-            
-            # Update count default based on mode
-            if mode == "single":
-                self.count_entry.delete(0, 'end')
-                self.count_entry.insert(0, "1")
-                self.count.set(1)
-            elif mode == "batch":
-                self.count_entry.delete(0, 'end')
-                self.count_entry.insert(0, "10")
-                self.count.set(10)
+            self.status_label.configure(text="Manual mode selected - enter QR code parameters (set count: 1 for single, multiple for batch)")
     
     def create_parameter_forms_section(self):
         """Create parameter input forms with validation (Task 25)"""
@@ -1605,7 +1584,7 @@ class QRGeneratorGUI:
     def init_default_values(self):
         """Initialize default values for the form"""
         # Set default operation mode
-        self.operation_mode.set("single")
+        self.operation_mode.set("manual")
         
         # Set default preset selection
         self.selected_preset.set("Select preset...")
@@ -1639,7 +1618,7 @@ class QRGeneratorGUI:
                     self.status_label.configure(text="Error: CSV file not found", text_color="red")
                     return
             else:
-                # Validate required parameters for single/batch modes
+                # Validate required parameters for manual mode
                 validation_result = self.validate_parameters()
                 if not validation_result[0]:
                     self.status_label.configure(text=f"Error: {validation_result[1]}", text_color="red")
@@ -1652,10 +1631,8 @@ class QRGeneratorGUI:
             # Execute generation based on mode
             if mode == "csv":
                 self.execute_csv_generation()
-            elif mode == "single":
-                self.execute_single_generation()
-            elif mode == "batch":
-                self.execute_batch_generation()
+            elif mode == "manual":
+                self.execute_manual_generation()
                 
         except Exception as e:
             self.status_label.configure(text=f"Error: {str(e)}", text_color="red")
@@ -1666,7 +1643,7 @@ class QRGeneratorGUI:
             # Validate integer inputs
             valid_uses = validate_integer_input(self.valid_uses.get(), "Valid Uses", 1)
             volume = validate_integer_input(self.volume.get(), "Volume", 1)
-            count = validate_integer_input(self.count.get(), "Count", 1) if self.operation_mode.get() == "batch" else 1
+            count = validate_integer_input(self.count.get(), "Count", 1)
             
             # Validate date format
             validate_date_format(self.end_date.get())
@@ -1767,53 +1744,16 @@ class QRGeneratorGUI:
         except Exception as e:
             self.status_label.configure(text=f"Error processing CSV: {str(e)}", text_color="red")
     
-    def execute_single_generation(self):
-        """Execute single QR code generation"""
-        try:
-            self.status_label.configure(text="Generating QR code...", text_color="orange")
-            self.root.update()
-            
-            # Call backend function
-            result_folder = create_qr_codes(
-                valid_uses=self.valid_uses.get(),
-                volume=self.volume.get(),
-                end_date=self.end_date.get(),
-                color=self.color.get(),
-                output_folder=self.output_directory.get(),
-                format=self.format.get(),
-                count=1,
-                csv_data=None,
-                security_code=self.security_code.get(),
-                suffix_code=self.suffix_code.get(),
-                qr_version=int(self.qr_version.get()) if self.qr_version.get() else None,
-                error_correction=self.error_correction.get(),
-                box_size=int(self.box_size.get()),
-                border=int(self.border.get()),
-                filename_prefix=self.filename_prefix.get(),
-                filename_suffix=self.filename_suffix.get(),
-                use_payload_as_filename=self.use_payload_filename.get(),
-                png_quality=int(self.png_quality.get()) if self.format.get() == "png" else 85,
-                svg_precision=int(self.svg_precision.get()) if self.format.get() == "svg" else 2
-            )
-            
-            # Handle ZIP creation if requested
-            if self.create_zip.get():
-                self.create_zip_file(result_folder)
-            
-            # Handle cleanup if requested
-            if self.cleanup_temp.get():
-                self.cleanup_temp_files(result_folder)
-            
-            self.status_label.configure(text="✅ Generated QR code successfully!", text_color="green")
-            
-        except Exception as e:
-            self.status_label.configure(text=f"Error generating QR code: {str(e)}", text_color="red")
-    
-    def execute_batch_generation(self):
-        """Execute batch sequential generation"""
+    def execute_manual_generation(self):
+        """Execute manual QR code generation (single or batch based on count)"""
         try:
             count = int(self.count.get())
-            self.status_label.configure(text=f"Generating {count} QR codes...", text_color="orange")
+            
+            # Dynamic status message based on count
+            if count == 1:
+                self.status_label.configure(text="Generating QR code...", text_color="orange")
+            else:
+                self.status_label.configure(text=f"Generating {count} QR codes...", text_color="orange")
             self.root.update()
             
             # Call backend function
@@ -1847,7 +1787,11 @@ class QRGeneratorGUI:
             if self.cleanup_temp.get():
                 self.cleanup_temp_files(result_folder)
             
-            self.status_label.configure(text=f"✅ Generated {count} QR codes successfully!", text_color="green")
+            # Dynamic success message based on count
+            if count == 1:
+                self.status_label.configure(text="✅ Generated QR code successfully!", text_color="green")
+            else:
+                self.status_label.configure(text=f"✅ Generated {count} QR codes successfully!", text_color="green")
             
         except Exception as e:
             self.status_label.configure(text=f"Error generating QR codes: {str(e)}", text_color="red")
