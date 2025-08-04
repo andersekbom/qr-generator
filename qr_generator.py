@@ -537,11 +537,17 @@ class QRGeneratorGUI:
         self.box_size = tk.IntVar(value=10)
         self.border = tk.IntVar(value=4)
         
+        # Filename customization variables (Task 27)
+        self.filename_prefix = tk.StringVar(value="")
+        self.filename_suffix = tk.StringVar(value="")
+        self.use_payload_filename = tk.BooleanVar(value=True)
+        
         # Output configuration variables
         self.output_directory = tk.StringVar(value="output")
         self.create_zip = tk.BooleanVar(value=True)
         self.zip_filename = tk.StringVar(value="")
         self.cleanup_files = tk.BooleanVar(value=False)
+        self.cleanup_temp = tk.BooleanVar(value=False)
         
         # Create main layout
         self.create_main_layout()
@@ -1615,11 +1621,269 @@ class QRGeneratorGUI:
         ctk.set_appearance_mode(new_mode)
     
     def generate_qr_codes(self):
-        """Main action - generate QR codes (placeholder for Task 30)"""
-        selected_mode = self.operation_mode.get()
-        mode_names = {"single": "Single Generation", "batch": "Batch Sequential", "csv": "CSV Import"}
-        self.status_label.configure(text=f"Selected: {mode_names[selected_mode]} - Full integration coming in Task 30...")
-        # TODO: Implement in Task 30 - Main window workflow integration
+        """Main action - generate QR codes with complete workflow integration"""
+        try:
+            # Update status
+            self.status_label.configure(text="Validating inputs...", text_color="orange")
+            self.root.update()
+            
+            # Get current mode
+            mode = self.operation_mode.get()
+            
+            # Validate inputs based on mode
+            if mode == "csv":
+                if not self.csv_file_path.get():
+                    self.status_label.configure(text="Error: Please select a CSV file", text_color="red")
+                    return
+                if not os.path.exists(self.csv_file_path.get()):
+                    self.status_label.configure(text="Error: CSV file not found", text_color="red")
+                    return
+            else:
+                # Validate required parameters for single/batch modes
+                validation_result = self.validate_parameters()
+                if not validation_result[0]:
+                    self.status_label.configure(text=f"Error: {validation_result[1]}", text_color="red")
+                    return
+            
+            # Update status
+            self.status_label.configure(text="Preparing generation...", text_color="orange")
+            self.root.update()
+            
+            # Execute generation based on mode
+            if mode == "csv":
+                self.execute_csv_generation()
+            elif mode == "single":
+                self.execute_single_generation()
+            elif mode == "batch":
+                self.execute_batch_generation()
+                
+        except Exception as e:
+            self.status_label.configure(text=f"Error: {str(e)}", text_color="red")
+    
+    def validate_parameters(self):
+        """Validate all input parameters"""
+        try:
+            # Validate integer inputs
+            valid_uses = validate_integer_input(self.valid_uses.get(), "Valid Uses", 1)
+            volume = validate_integer_input(self.volume.get(), "Volume", 1)
+            count = validate_integer_input(self.count.get(), "Count", 1) if self.operation_mode.get() == "batch" else 1
+            
+            # Validate date format
+            validate_date_format(self.end_date.get())
+            
+            # Validate color format
+            validate_color_format(self.color.get())
+            
+            # Validate format
+            validate_format(self.format.get())
+            
+            # Validate QR parameters
+            if self.qr_version.get():
+                validate_qr_version(self.qr_version.get())
+            validate_error_correction(self.error_correction.get())
+            validate_integer_input(self.box_size.get(), "Box Size", 1, 50)
+            validate_integer_input(self.border.get(), "Border", 0, 20)
+            
+            # Validate format-specific parameters
+            if self.format.get() == "png":
+                validate_png_quality(self.png_quality.get())
+            elif self.format.get() == "svg":
+                validate_svg_precision(self.svg_precision.get())
+            
+            # Validate output directory
+            output_dir = self.output_directory.get()
+            if not output_dir:
+                return False, "Please select an output directory"
+            
+            return True, "All parameters valid"
+            
+        except ValueError as e:
+            return False, str(e)
+    
+    def execute_csv_generation(self):
+        """Execute CSV-based generation"""
+        csv_file = self.csv_file_path.get()
+        
+        # Load and detect CSV format
+        self.status_label.configure(text="Loading CSV file...", text_color="orange")
+        self.root.update()
+        
+        try:
+            # Read CSV with auto-delimiter detection
+            import csv
+            with open(csv_file, 'r', encoding='utf-8') as file:
+                # Try to detect delimiter
+                sample = file.read(1024)
+                file.seek(0)
+                sniffer = csv.Sniffer()
+                delimiter = sniffer.sniff(sample).delimiter
+                
+                # Read CSV data
+                reader = csv.reader(file, delimiter=delimiter)
+                csv_data = list(reader)
+                
+            if not csv_data:
+                self.status_label.configure(text="Error: CSV file is empty", text_color="red")
+                return
+            
+            # Update status
+            self.status_label.configure(text=f"Generating {len(csv_data)} QR codes...", text_color="orange")
+            self.root.update()
+            
+            # Call backend function
+            result_folder = create_qr_codes(
+                valid_uses=self.valid_uses.get(),
+                volume=self.volume.get(),
+                end_date=self.end_date.get(),
+                color=self.color.get(),
+                output_folder=self.output_directory.get(),
+                format=self.format.get(),
+                count=1,
+                csv_data=csv_data,
+                input_column=0,  # Default to first column
+                security_code=self.security_code.get(),
+                suffix_code=self.suffix_code.get(),
+                qr_version=int(self.qr_version.get()) if self.qr_version.get() else None,
+                error_correction=self.error_correction.get(),
+                box_size=int(self.box_size.get()),
+                border=int(self.border.get()),
+                filename_prefix=self.filename_prefix.get(),
+                filename_suffix=self.filename_suffix.get(),
+                use_payload_as_filename=self.use_payload_filename.get(),
+                png_quality=int(self.png_quality.get()) if self.format.get() == "png" else 85,
+                svg_precision=int(self.svg_precision.get()) if self.format.get() == "svg" else 2
+            )
+            
+            # Handle ZIP creation if requested
+            if self.create_zip.get():
+                self.create_zip_file(result_folder)
+            
+            # Handle cleanup if requested
+            if self.cleanup_temp.get():
+                self.cleanup_temp_files(result_folder)
+            
+            self.status_label.configure(text=f"✅ Generated {len(csv_data)} QR codes successfully!", text_color="green")
+            
+        except Exception as e:
+            self.status_label.configure(text=f"Error processing CSV: {str(e)}", text_color="red")
+    
+    def execute_single_generation(self):
+        """Execute single QR code generation"""
+        try:
+            self.status_label.configure(text="Generating QR code...", text_color="orange")
+            self.root.update()
+            
+            # Call backend function
+            result_folder = create_qr_codes(
+                valid_uses=self.valid_uses.get(),
+                volume=self.volume.get(),
+                end_date=self.end_date.get(),
+                color=self.color.get(),
+                output_folder=self.output_directory.get(),
+                format=self.format.get(),
+                count=1,
+                csv_data=None,
+                security_code=self.security_code.get(),
+                suffix_code=self.suffix_code.get(),
+                qr_version=int(self.qr_version.get()) if self.qr_version.get() else None,
+                error_correction=self.error_correction.get(),
+                box_size=int(self.box_size.get()),
+                border=int(self.border.get()),
+                filename_prefix=self.filename_prefix.get(),
+                filename_suffix=self.filename_suffix.get(),
+                use_payload_as_filename=self.use_payload_filename.get(),
+                png_quality=int(self.png_quality.get()) if self.format.get() == "png" else 85,
+                svg_precision=int(self.svg_precision.get()) if self.format.get() == "svg" else 2
+            )
+            
+            # Handle ZIP creation if requested
+            if self.create_zip.get():
+                self.create_zip_file(result_folder)
+            
+            # Handle cleanup if requested
+            if self.cleanup_temp.get():
+                self.cleanup_temp_files(result_folder)
+            
+            self.status_label.configure(text="✅ Generated QR code successfully!", text_color="green")
+            
+        except Exception as e:
+            self.status_label.configure(text=f"Error generating QR code: {str(e)}", text_color="red")
+    
+    def execute_batch_generation(self):
+        """Execute batch sequential generation"""
+        try:
+            count = int(self.count.get())
+            self.status_label.configure(text=f"Generating {count} QR codes...", text_color="orange")
+            self.root.update()
+            
+            # Call backend function
+            result_folder = create_qr_codes(
+                valid_uses=self.valid_uses.get(),
+                volume=self.volume.get(),
+                end_date=self.end_date.get(),
+                color=self.color.get(),
+                output_folder=self.output_directory.get(),
+                format=self.format.get(),
+                count=count,
+                csv_data=None,
+                security_code=self.security_code.get(),
+                suffix_code=self.suffix_code.get(),
+                qr_version=int(self.qr_version.get()) if self.qr_version.get() else None,
+                error_correction=self.error_correction.get(),
+                box_size=int(self.box_size.get()),
+                border=int(self.border.get()),
+                filename_prefix=self.filename_prefix.get(),
+                filename_suffix=self.filename_suffix.get(),
+                use_payload_as_filename=self.use_payload_filename.get(),
+                png_quality=int(self.png_quality.get()) if self.format.get() == "png" else 85,
+                svg_precision=int(self.svg_precision.get()) if self.format.get() == "svg" else 2
+            )
+            
+            # Handle ZIP creation if requested
+            if self.create_zip.get():
+                self.create_zip_file(result_folder)
+            
+            # Handle cleanup if requested
+            if self.cleanup_temp.get():
+                self.cleanup_temp_files(result_folder)
+            
+            self.status_label.configure(text=f"✅ Generated {count} QR codes successfully!", text_color="green")
+            
+        except Exception as e:
+            self.status_label.configure(text=f"Error generating QR codes: {str(e)}", text_color="red")
+    
+    def create_zip_file(self, folder_path):
+        """Create ZIP file from generated QR codes"""
+        try:
+            import zipfile
+            import datetime
+            
+            # Create ZIP filename with timestamp
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            zip_filename = f"qr_codes_{timestamp}.zip"
+            zip_path = os.path.join(os.path.dirname(folder_path), zip_filename)
+            
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for root, dirs, files in os.walk(folder_path):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        arc_path = os.path.relpath(file_path, folder_path)
+                        zipf.write(file_path, arc_path)
+            
+            self.status_label.configure(text=f"✅ ZIP created: {zip_filename}", text_color="green")
+            
+        except Exception as e:
+            self.status_label.configure(text=f"Warning: ZIP creation failed: {str(e)}", text_color="orange")
+    
+    def cleanup_temp_files(self, folder_path):
+        """Clean up temporary files if requested"""
+        try:
+            import shutil
+            if os.path.exists(folder_path):
+                shutil.rmtree(folder_path)
+                
+        except Exception as e:
+            self.status_label.configure(text=f"Warning: Cleanup failed: {str(e)}", text_color="orange")
     
     def run(self):
         """Start the GUI application"""
