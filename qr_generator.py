@@ -528,6 +528,15 @@ class QRGeneratorGUI:
         self.suffix_code = tk.StringVar(value="23FF45EE")
         self.count = tk.IntVar(value=1)
         
+        # Format and advanced options variables
+        self.format = tk.StringVar(value="png")
+        self.png_quality = tk.IntVar(value=85)
+        self.svg_precision = tk.IntVar(value=2)
+        self.qr_version = tk.StringVar(value="auto")
+        self.error_correction = tk.StringVar(value="L")
+        self.box_size = tk.IntVar(value=10)
+        self.border = tk.IntVar(value=4)
+        
         # Create main layout
         self.create_main_layout()
         
@@ -605,8 +614,11 @@ class QRGeneratorGUI:
         # Parameter Input Forms Section (Task 25) - IMPLEMENTED
         self.create_parameter_forms_section()
         
+        # Format and Advanced Options Section (Task 26) - IMPLEMENTED
+        self.create_format_options_section()
+        
         # Additional placeholder sections for other tasks
-        # TODO: Task 26-35 sections will be added here
+        # TODO: Task 27-35 sections will be added here
     
     def create_footer_section(self):
         """Create footer with main action buttons"""
@@ -965,10 +977,12 @@ class QRGeneratorGUI:
         if mode == "csv":
             self.show_csv_section(True)
             self.show_parameter_section(False)
+            self.show_format_section(True)  # CSV mode also needs format options
             self.status_label.configure(text="CSV mode selected - choose a CSV file to import data")
         else:
             self.show_csv_section(False)
             self.show_parameter_section(True)
+            self.show_format_section(True)  # Single/batch modes need format options
             mode_names = {"single": "Single Generation", "batch": "Batch Sequential"}
             self.status_label.configure(text=f"{mode_names[mode]} mode selected - enter QR code parameters")
             
@@ -1166,6 +1180,219 @@ class QRGeneratorGUI:
             self.params_frame.grid()
         else:
             self.params_frame.grid_remove()
+    
+    def create_format_options_section(self):
+        """Create format and advanced options panel (Task 26)"""
+        self.format_frame = ctk.CTkFrame(self.content_frame)
+        self.format_frame.grid(row=4, column=0, sticky="ew", padx=10, pady=10)
+        self.format_frame.grid_columnconfigure(1, weight=1)
+        self.format_frame.grid_columnconfigure(3, weight=1)
+        
+        # Section title
+        ctk.CTkLabel(
+            self.format_frame, 
+            text="Format & Advanced Options:", 
+            font=ctk.CTkFont(weight="bold", size=16)
+        ).grid(row=0, column=0, columnspan=4, padx=20, pady=(15, 10), sticky="w")
+        
+        # Format selection
+        format_selection_frame = ctk.CTkFrame(self.format_frame)
+        format_selection_frame.grid(row=1, column=0, columnspan=4, sticky="ew", padx=15, pady=(5, 10))
+        
+        ctk.CTkLabel(format_selection_frame, text="Output Format:", font=ctk.CTkFont(size=12, weight="bold")).grid(
+            row=0, column=0, padx=15, pady=8, sticky="w")
+        
+        # Format radio buttons
+        self.format_png = ctk.CTkRadioButton(
+            format_selection_frame,
+            text="PNG (Raster Image)",
+            variable=self.format,
+            value="png",
+            command=self.on_format_change
+        )
+        self.format_png.grid(row=0, column=1, padx=20, pady=8, sticky="w")
+        
+        self.format_svg = ctk.CTkRadioButton(
+            format_selection_frame,
+            text="SVG (Vector Image)",
+            variable=self.format,
+            value="svg",
+            command=self.on_format_change
+        )
+        self.format_svg.grid(row=0, column=2, padx=20, pady=8, sticky="w")
+        
+        # Format-specific options frame
+        self.format_specific_frame = ctk.CTkFrame(self.format_frame)
+        self.format_specific_frame.grid(row=2, column=0, columnspan=4, sticky="ew", padx=15, pady=(5, 10))
+        self.format_specific_frame.grid_columnconfigure(1, weight=1)
+        
+        # PNG Quality slider (initially visible)
+        self.png_quality_label = ctk.CTkLabel(self.format_specific_frame, text="PNG Quality:", font=ctk.CTkFont(size=12))
+        self.png_quality_label.grid(row=0, column=0, padx=15, pady=8, sticky="w")
+        
+        self.png_quality_slider = ctk.CTkSlider(
+            self.format_specific_frame,
+            from_=0,
+            to=100,
+            number_of_steps=100,
+            variable=self.png_quality,
+            command=self.update_png_quality_label
+        )
+        self.png_quality_slider.grid(row=0, column=1, padx=15, pady=8, sticky="ew")
+        
+        self.png_quality_value = ctk.CTkLabel(self.format_specific_frame, text="85", font=ctk.CTkFont(size=12))
+        self.png_quality_value.grid(row=0, column=2, padx=15, pady=8, sticky="w")
+        
+        # SVG Precision slider (initially hidden)
+        self.svg_precision_label = ctk.CTkLabel(self.format_specific_frame, text="SVG Precision:", font=ctk.CTkFont(size=12))
+        self.svg_precision_slider = ctk.CTkSlider(
+            self.format_specific_frame,
+            from_=0,
+            to=10,
+            number_of_steps=10,
+            variable=self.svg_precision,
+            command=self.update_svg_precision_label
+        )
+        self.svg_precision_value = ctk.CTkLabel(self.format_specific_frame, text="2", font=ctk.CTkFont(size=12))
+        
+        # Advanced QR Options frame
+        self.advanced_frame = ctk.CTkFrame(self.format_frame)
+        self.advanced_frame.grid(row=3, column=0, columnspan=4, sticky="ew", padx=15, pady=(5, 10))
+        self.advanced_frame.grid_columnconfigure(1, weight=1)
+        self.advanced_frame.grid_columnconfigure(3, weight=1)
+        
+        # Advanced options toggle
+        self.show_advanced = tk.BooleanVar(value=False)
+        self.advanced_toggle = ctk.CTkCheckBox(
+            self.advanced_frame,
+            text="Show Advanced QR Code Options",
+            variable=self.show_advanced,
+            command=self.toggle_advanced_options,
+            font=ctk.CTkFont(size=12, weight="bold")
+        )
+        self.advanced_toggle.grid(row=0, column=0, columnspan=4, padx=15, pady=8, sticky="w")
+        
+        # Advanced options content (initially hidden)
+        self.advanced_content = ctk.CTkFrame(self.advanced_frame)
+        
+        # QR Version
+        ctk.CTkLabel(self.advanced_content, text="QR Version:", font=ctk.CTkFont(size=12)).grid(
+            row=1, column=0, padx=15, pady=8, sticky="w")
+        
+        self.qr_version_combo = ctk.CTkComboBox(
+            self.advanced_content,
+            variable=self.qr_version,
+            values=["auto"] + [str(i) for i in range(1, 41)],
+            width=80
+        )
+        self.qr_version_combo.grid(row=1, column=1, padx=15, pady=8, sticky="w")
+        
+        # Error Correction
+        ctk.CTkLabel(self.advanced_content, text="Error Correction:", font=ctk.CTkFont(size=12)).grid(
+            row=1, column=2, padx=15, pady=8, sticky="w")
+        
+        self.error_correction_combo = ctk.CTkComboBox(
+            self.advanced_content,
+            variable=self.error_correction,
+            values=["L", "M", "Q", "H"],
+            width=80
+        )
+        self.error_correction_combo.grid(row=1, column=3, padx=15, pady=8, sticky="w")
+        
+        # Box Size
+        ctk.CTkLabel(self.advanced_content, text="Box Size:", font=ctk.CTkFont(size=12)).grid(
+            row=2, column=0, padx=15, pady=8, sticky="w")
+        
+        self.box_size_slider = ctk.CTkSlider(
+            self.advanced_content,
+            from_=1,
+            to=50,
+            number_of_steps=49,
+            variable=self.box_size,
+            command=self.update_box_size_label
+        )
+        self.box_size_slider.grid(row=2, column=1, padx=15, pady=8, sticky="ew")
+        
+        self.box_size_value = ctk.CTkLabel(self.advanced_content, text="10", font=ctk.CTkFont(size=12))
+        self.box_size_value.grid(row=2, column=2, padx=15, pady=8, sticky="w")
+        
+        # Border Size
+        ctk.CTkLabel(self.advanced_content, text="Border:", font=ctk.CTkFont(size=12)).grid(
+            row=2, column=3, padx=15, pady=8, sticky="w")
+        
+        border_frame = ctk.CTkFrame(self.advanced_content)
+        border_frame.grid(row=2, column=3, padx=15, pady=8, sticky="w")
+        
+        self.border_slider = ctk.CTkSlider(
+            border_frame,
+            from_=0,
+            to=20,
+            number_of_steps=20,
+            variable=self.border,
+            command=self.update_border_label,
+            width=80
+        )
+        self.border_slider.grid(row=0, column=0, padx=5, pady=5, sticky="w")
+        
+        self.border_value = ctk.CTkLabel(border_frame, text="4", font=ctk.CTkFont(size=12))
+        self.border_value.grid(row=0, column=1, padx=5, pady=5, sticky="w")
+        
+        # Initially hide the parameter section and advanced options
+        self.format_frame.grid_remove()
+    
+    def on_format_change(self):
+        """Handle format selection changes to show format-specific options"""
+        format_type = self.format.get()
+        
+        # Hide all format-specific options first
+        self.png_quality_label.grid_remove()
+        self.png_quality_slider.grid_remove()
+        self.png_quality_value.grid_remove()
+        self.svg_precision_label.grid_remove()
+        self.svg_precision_slider.grid_remove()
+        self.svg_precision_value.grid_remove()
+        
+        # Show relevant format-specific options
+        if format_type == "png":
+            self.png_quality_label.grid(row=0, column=0, padx=15, pady=8, sticky="w")
+            self.png_quality_slider.grid(row=0, column=1, padx=15, pady=8, sticky="ew")
+            self.png_quality_value.grid(row=0, column=2, padx=15, pady=8, sticky="w")
+        elif format_type == "svg":
+            self.svg_precision_label.grid(row=0, column=0, padx=15, pady=8, sticky="w")
+            self.svg_precision_slider.grid(row=0, column=1, padx=15, pady=8, sticky="ew")
+            self.svg_precision_value.grid(row=0, column=2, padx=15, pady=8, sticky="w")
+    
+    def toggle_advanced_options(self):
+        """Show or hide advanced QR code options"""
+        if self.show_advanced.get():
+            self.advanced_content.grid(row=1, column=0, columnspan=4, sticky="ew", padx=10, pady=(5, 10))
+            self.advanced_content.grid_columnconfigure(1, weight=1)
+            self.advanced_content.grid_columnconfigure(3, weight=1)
+        else:
+            self.advanced_content.grid_remove()
+    
+    def update_png_quality_label(self, value):
+        """Update PNG quality label with current value"""
+        self.png_quality_value.configure(text=str(int(float(value))))
+    
+    def update_svg_precision_label(self, value):
+        """Update SVG precision label with current value"""
+        self.svg_precision_value.configure(text=str(int(float(value))))
+    
+    def update_box_size_label(self, value):
+        """Update box size label with current value"""
+        self.box_size_value.configure(text=str(int(float(value))))
+    
+    def update_border_label(self, value):
+        """Update border label with current value"""
+        self.border_value.configure(text=str(int(float(value))))
+    
+    def show_format_section(self, show=True):
+        """Show or hide the format and advanced options section"""
+        if show:
+            self.format_frame.grid()
+        else:
+            self.format_frame.grid_remove()
     
     def init_default_values(self):
         """Initialize default values for the form"""
