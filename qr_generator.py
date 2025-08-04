@@ -587,27 +587,11 @@ class QRGeneratorGUI:
         # Operation Mode Section (Task 22) - IMPLEMENTED
         self.create_operation_mode_section()
         
+        # Preset Management Section (Task 23) - IMPLEMENTED
+        self.create_preset_management_section()
+        
         # Additional placeholder sections for other tasks
-        
-        # Preset Management Section (Task 23)
-        preset_frame = ctk.CTkFrame(self.content_frame)
-        preset_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=10)
-        preset_frame.grid_columnconfigure(1, weight=1)
-        
-        ctk.CTkLabel(preset_frame, text="Presets:", font=ctk.CTkFont(weight="bold")).grid(
-            row=0, column=0, padx=20, pady=15, sticky="w")
-        ctk.CTkLabel(preset_frame, text="[Coming in Task 23]", text_color="gray").grid(
-            row=0, column=1, padx=20, pady=15, sticky="w")
-        
-        # Parameters Section (Task 25)
-        params_frame = ctk.CTkFrame(self.content_frame)
-        params_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=10)
-        params_frame.grid_columnconfigure(1, weight=1)
-        
-        ctk.CTkLabel(params_frame, text="Parameters:", font=ctk.CTkFont(weight="bold")).grid(
-            row=0, column=0, padx=20, pady=15, sticky="w")
-        ctk.CTkLabel(params_frame, text="[Coming in Task 25]", text_color="gray").grid(
-            row=0, column=1, padx=20, pady=15, sticky="w")
+        # TODO: Task 24-35 sections will be added here
     
     def create_footer_section(self):
         """Create footer with main action buttons"""
@@ -677,10 +661,148 @@ class QRGeneratorGUI:
         # Add some spacing
         mode_frame.grid_rowconfigure(2, minsize=15)
     
+    def create_preset_management_section(self):
+        """Create preset management with dropdown and buttons (Task 23)"""
+        preset_frame = ctk.CTkFrame(self.content_frame)
+        preset_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=10)
+        preset_frame.grid_columnconfigure(1, weight=1)
+        
+        # Section title
+        ctk.CTkLabel(
+            preset_frame, 
+            text="Parameter Presets:", 
+            font=ctk.CTkFont(weight="bold", size=16)
+        ).grid(row=0, column=0, columnspan=4, padx=20, pady=(15, 10), sticky="w")
+        
+        # Preset dropdown
+        self.preset_dropdown = ctk.CTkComboBox(
+            preset_frame,
+            variable=self.selected_preset,
+            values=self.get_available_presets(),
+            state="readonly",
+            width=200
+        )
+        self.preset_dropdown.grid(row=1, column=0, padx=20, pady=10, sticky="w")
+        
+        # Management buttons
+        self.load_preset_btn = ctk.CTkButton(
+            preset_frame,
+            text="Load",
+            width=80,
+            command=self.load_selected_preset
+        )
+        self.load_preset_btn.grid(row=1, column=1, padx=10, pady=10, sticky="w")
+        
+        self.save_preset_btn = ctk.CTkButton(
+            preset_frame,
+            text="Save New",
+            width=80,
+            command=self.save_new_preset
+        )
+        self.save_preset_btn.grid(row=1, column=2, padx=10, pady=10, sticky="w")
+        
+        self.delete_preset_btn = ctk.CTkButton(
+            preset_frame,
+            text="Delete",
+            width=80,
+            command=self.delete_selected_preset,
+            fg_color="darkred",
+            hover_color="red"
+        )
+        self.delete_preset_btn.grid(row=1, column=3, padx=10, pady=10, sticky="w")
+        
+        # Status label for preset operations
+        self.preset_status = ctk.CTkLabel(
+            preset_frame,
+            text="Select a preset to load saved parameters",
+            text_color="gray",
+            font=ctk.CTkFont(size=11)
+        )
+        self.preset_status.grid(row=2, column=0, columnspan=4, padx=20, pady=(5, 15), sticky="w")
+    
+    def get_available_presets(self):
+        """Get list of available preset names"""
+        try:
+            preset_dir = "presets"
+            if os.path.exists(preset_dir):
+                presets = [f[:-5] for f in os.listdir(preset_dir) if f.endswith('.json')]
+                return ["Select preset..."] + sorted(presets)
+            return ["Select preset..."]
+        except Exception:
+            return ["Select preset..."]
+    
+    def refresh_preset_list(self):
+        """Refresh the preset dropdown list"""
+        self.preset_dropdown.configure(values=self.get_available_presets())
+    
+    def load_selected_preset(self):
+        """Load the selected preset from dropdown"""
+        preset_name = self.selected_preset.get()
+        if preset_name and preset_name != "Select preset...":
+            success, result = load_preset(preset_name)
+            if success:
+                self.preset_status.configure(text=f"✅ Loaded preset: {preset_name}", text_color="green")
+                # TODO: Task 30 - Apply preset values to form fields
+            else:
+                self.preset_status.configure(text=f"❌ Error: {result}", text_color="red")
+        else:
+            self.preset_status.configure(text="Please select a preset first", text_color="orange")
+    
+    def save_new_preset(self):
+        """Save current form values as new preset"""
+        # Create dialog for preset name
+        dialog = ctk.CTkInputDialog(text="Enter name for new preset:", title="Save Preset")
+        preset_name = dialog.get_input()
+        
+        if preset_name:
+            # TODO: Task 30 - Collect current form values
+            # For now, create a sample preset structure
+            preset_params = {
+                "mode": self.operation_mode.get(),
+                "created": "GUI v2.0"
+            }
+            
+            success, result = save_preset(preset_name, preset_params)
+            if success:
+                self.preset_status.configure(text=f"✅ Saved preset: {preset_name}", text_color="green")
+                self.refresh_preset_list()
+                self.selected_preset.set(preset_name)
+            else:
+                self.preset_status.configure(text=f"❌ Error: {result}", text_color="red")
+        else:
+            self.preset_status.configure(text="Save cancelled", text_color="gray")
+    
+    def delete_selected_preset(self):
+        """Delete the selected preset"""
+        preset_name = self.selected_preset.get()
+        if preset_name and preset_name != "Select preset...":
+            # Confirmation dialog
+            dialog = ctk.CTkInputDialog(
+                text=f"Type 'DELETE' to confirm deletion of preset '{preset_name}':", 
+                title="Confirm Deletion"
+            )
+            confirm = dialog.get_input()
+            
+            if confirm == "DELETE":
+                success, result = delete_preset(preset_name)
+                if success:
+                    self.preset_status.configure(text=f"✅ Deleted preset: {preset_name}", text_color="green")
+                    self.refresh_preset_list()
+                    self.selected_preset.set("Select preset...")
+                else:
+                    self.preset_status.configure(text=f"❌ Error: {result}", text_color="red")
+            else:
+                self.preset_status.configure(text="Deletion cancelled", text_color="gray")
+        else:
+            self.preset_status.configure(text="Please select a preset to delete", text_color="orange")
+    
     def init_default_values(self):
         """Initialize default values for the form"""
         # Set default operation mode
         self.operation_mode.set("single")
+        
+        # Set default preset selection
+        self.selected_preset.set("Select preset...")
     
     def toggle_theme(self):
         """Toggle between light and dark themes"""
