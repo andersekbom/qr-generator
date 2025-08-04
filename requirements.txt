@@ -1,4 +1,22 @@
-qrcode
-tqdm
-colorama
-pillow
+# QR Generator Dependencies
+# Core QR code generation library
+qrcode==8.2
+
+# Progress bars for batch operations
+tqdm==4.67.1
+
+# Cross-platform colored console output
+colorama==0.4.6
+
+# Python Imaging Library for image processing
+pillow==11.3.0
+
+# Note: The following standard library modules are also used but don't require installation:
+# - tkinter (GUI dialogs - included with Python)
+# - csv (CSV file processing)
+# - os (operating system interface)
+# - zipfile (ZIP file creation)
+# - re (regular expressions)
+# - xml.etree.ElementTree (XML processing)
+# - datetime (date/time handling)
+# - json (JSON data handling)

@@ -6,9 +6,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Environment Setup
 ```bash
+# Create and activate virtual environment
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies with specific versions
 pip install -r requirements.txt
+
+# Verify installation
+python -c "import qr_generator; print('✅ Setup complete!')"
 ```
 
 ### Running Applications
