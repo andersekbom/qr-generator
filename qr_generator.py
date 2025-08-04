@@ -537,6 +537,12 @@ class QRGeneratorGUI:
         self.box_size = tk.IntVar(value=10)
         self.border = tk.IntVar(value=4)
         
+        # Output configuration variables
+        self.output_directory = tk.StringVar(value="output")
+        self.create_zip = tk.BooleanVar(value=True)
+        self.zip_filename = tk.StringVar(value="")
+        self.cleanup_files = tk.BooleanVar(value=False)
+        
         # Create main layout
         self.create_main_layout()
         
@@ -617,8 +623,11 @@ class QRGeneratorGUI:
         # Format and Advanced Options Section (Task 26) - IMPLEMENTED
         self.create_format_options_section()
         
+        # Output Configuration Section (Task 28) - IMPLEMENTED
+        self.create_output_config_section()
+        
         # Additional placeholder sections for other tasks
-        # TODO: Task 27-35 sections will be added here
+        # TODO: Task 27, 29-35 sections will be added here
     
     def create_footer_section(self):
         """Create footer with main action buttons"""
@@ -978,11 +987,13 @@ class QRGeneratorGUI:
             self.show_csv_section(True)
             self.show_parameter_section(False)
             self.show_format_section(True)  # CSV mode also needs format options
+            self.show_output_section(True)  # All modes need output options
             self.status_label.configure(text="CSV mode selected - choose a CSV file to import data")
         else:
             self.show_csv_section(False)
             self.show_parameter_section(True)
             self.show_format_section(True)  # Single/batch modes need format options
+            self.show_output_section(True)  # All modes need output options
             mode_names = {"single": "Single Generation", "batch": "Batch Sequential"}
             self.status_label.configure(text=f"{mode_names[mode]} mode selected - enter QR code parameters")
             
@@ -1393,6 +1404,197 @@ class QRGeneratorGUI:
             self.format_frame.grid()
         else:
             self.format_frame.grid_remove()
+    
+    def create_output_config_section(self):
+        """Create output configuration panel (Task 28)"""
+        self.output_frame = ctk.CTkFrame(self.content_frame)
+        self.output_frame.grid(row=5, column=0, sticky="ew", padx=10, pady=10)
+        self.output_frame.grid_columnconfigure(1, weight=1)
+        
+        # Section title
+        ctk.CTkLabel(
+            self.output_frame, 
+            text="Output Configuration:", 
+            font=ctk.CTkFont(weight="bold", size=16)
+        ).grid(row=0, column=0, columnspan=4, padx=20, pady=(15, 10), sticky="w")
+        
+        # Output directory selection
+        output_dir_frame = ctk.CTkFrame(self.output_frame)
+        output_dir_frame.grid(row=1, column=0, columnspan=4, sticky="ew", padx=15, pady=(5, 10))
+        output_dir_frame.grid_columnconfigure(1, weight=1)
+        
+        ctk.CTkLabel(output_dir_frame, text="Output Directory:", font=ctk.CTkFont(size=12, weight="bold")).grid(
+            row=0, column=0, padx=15, pady=8, sticky="w")
+        
+        self.output_dir_entry = ctk.CTkEntry(
+            output_dir_frame,
+            textvariable=self.output_directory,
+            placeholder_text="output",
+            width=300
+        )
+        self.output_dir_entry.grid(row=0, column=1, padx=15, pady=8, sticky="ew")
+        
+        self.browse_output_btn = ctk.CTkButton(
+            output_dir_frame,
+            text="Browse",
+            width=80,
+            command=self.browse_output_directory
+        )
+        self.browse_output_btn.grid(row=0, column=2, padx=10, pady=8, sticky="w")
+        
+        self.reset_output_btn = ctk.CTkButton(
+            output_dir_frame,
+            text="Reset",
+            width=60,
+            command=self.reset_output_directory,
+            fg_color="gray",
+            hover_color="darkgray"
+        )
+        self.reset_output_btn.grid(row=0, column=3, padx=10, pady=8, sticky="w")
+        
+        # ZIP file options
+        zip_frame = ctk.CTkFrame(self.output_frame)
+        zip_frame.grid(row=2, column=0, columnspan=4, sticky="ew", padx=15, pady=(5, 10))
+        zip_frame.grid_columnconfigure(1, weight=1)
+        
+        self.zip_checkbox = ctk.CTkCheckBox(
+            zip_frame,
+            text="Create ZIP file",
+            variable=self.create_zip,
+            command=self.on_zip_toggle,
+            font=ctk.CTkFont(size=12, weight="bold")
+        )
+        self.zip_checkbox.grid(row=0, column=0, padx=15, pady=8, sticky="w")
+        
+        # ZIP filename entry (initially visible since create_zip defaults to True)
+        zip_name_frame = ctk.CTkFrame(zip_frame)
+        zip_name_frame.grid(row=1, column=0, columnspan=4, sticky="ew", padx=10, pady=(5, 10))
+        zip_name_frame.grid_columnconfigure(1, weight=1)
+        
+        self.zip_filename_label = ctk.CTkLabel(zip_name_frame, text="ZIP filename:", font=ctk.CTkFont(size=12))
+        self.zip_filename_label.grid(row=0, column=0, padx=15, pady=8, sticky="w")
+        
+        self.zip_filename_entry = ctk.CTkEntry(
+            zip_name_frame,
+            textvariable=self.zip_filename,
+            placeholder_text="auto-generated based on parameters",
+            width=250
+        )
+        self.zip_filename_entry.grid(row=0, column=1, padx=15, pady=8, sticky="ew")
+        
+        self.auto_zip_btn = ctk.CTkButton(
+            zip_name_frame,
+            text="Auto",
+            width=60,
+            command=self.generate_auto_zip_name,
+            fg_color="darkblue",
+            hover_color="blue"
+        )
+        self.auto_zip_btn.grid(row=0, column=2, padx=10, pady=8, sticky="w")
+        
+        self.zip_name_frame = zip_name_frame  # Store reference for show/hide
+        
+        # File cleanup options
+        cleanup_frame = ctk.CTkFrame(self.output_frame)
+        cleanup_frame.grid(row=3, column=0, columnspan=4, sticky="ew", padx=15, pady=(5, 15))
+        
+        self.cleanup_checkbox = ctk.CTkCheckBox(
+            cleanup_frame,
+            text="Delete original files after ZIP creation (keep only ZIP file)",
+            variable=self.cleanup_files,
+            font=ctk.CTkFont(size=12)
+        )
+        self.cleanup_checkbox.grid(row=0, column=0, padx=15, pady=10, sticky="w")
+        
+        # Output status
+        self.output_status = ctk.CTkLabel(
+            self.output_frame,
+            text="Files will be saved to the output directory",
+            text_color="gray",
+            font=ctk.CTkFont(size=11)
+        )
+        self.output_status.grid(row=4, column=0, columnspan=4, padx=20, pady=(5, 15), sticky="w")
+        
+        # Initially hide the output section
+        self.output_frame.grid_remove()
+    
+    def browse_output_directory(self):
+        """Open directory dialog to select output directory"""
+        try:
+            from tkinter import filedialog
+            directory = filedialog.askdirectory(
+                title="Select Output Directory",
+                initialdir=self.output_directory.get()
+            )
+            
+            if directory:
+                self.output_directory.set(directory)
+                self.output_status.configure(
+                    text=f"✅ Output directory: {directory}",
+                    text_color="green"
+                )
+        except Exception as e:
+            self.output_status.configure(
+                text=f"❌ Error selecting directory: {e}",
+                text_color="red"
+            )
+    
+    def reset_output_directory(self):
+        """Reset output directory to default"""
+        self.output_directory.set("output")
+        self.output_status.configure(
+            text="Output directory reset to default: output",
+            text_color="blue"
+        )
+    
+    def on_zip_toggle(self):
+        """Handle ZIP checkbox toggle to show/hide ZIP filename options"""
+        if self.create_zip.get():
+            self.zip_name_frame.grid(row=1, column=0, columnspan=4, sticky="ew", padx=10, pady=(5, 10))
+            self.cleanup_checkbox.configure(state="normal")
+            self.output_status.configure(text="ZIP file will be created from generated files")
+        else:
+            self.zip_name_frame.grid_remove()
+            self.cleanup_files.set(False)  # Can't cleanup if no ZIP
+            self.cleanup_checkbox.configure(state="disabled")
+            self.output_status.configure(text="Files will be saved individually (no ZIP)")
+    
+    def generate_auto_zip_name(self):
+        """Generate automatic ZIP filename based on current parameters"""
+        try:
+            mode = self.operation_mode.get()
+            format_type = self.format.get()
+            
+            if mode == "csv":
+                # For CSV mode, use a generic name
+                auto_name = f"qr_codes_csv.{format_type}.zip"
+            else:
+                # For single/batch mode, use parameters
+                uses = self.valid_uses.get() or "15"
+                volume = self.volume.get() or "500"
+                count = self.count.get() or 1
+                auto_name = f"QR-{uses}-{volume}-{count}-{format_type}.zip"
+            
+            self.zip_filename.set(auto_name)
+            self.output_status.configure(
+                text=f"✅ Auto-generated ZIP name: {auto_name}",
+                text_color="green"
+            )
+        except Exception as e:
+            self.output_status.configure(
+                text=f"❌ Error generating ZIP name: {e}",
+                text_color="red"
+            )
+    
+    def show_output_section(self, show=True):
+        """Show or hide the output configuration section"""
+        if show:
+            self.output_frame.grid()
+            # Update auto ZIP name when section becomes visible
+            if not self.zip_filename.get():
+                self.generate_auto_zip_name()
+        else:
+            self.output_frame.grid_remove()
     
     def init_default_values(self):
         """Initialize default values for the form"""
