@@ -1595,7 +1595,7 @@ class QRGeneratorGUI:
     
     def toggle_theme(self):
         """Toggle between light and dark themes"""
-        current_mode = ctk.get_appearance_mode()
+        current_mode = ctk.get_appearance_mode().lower()
         new_mode = "light" if current_mode == "dark" else "dark"
         ctk.set_appearance_mode(new_mode)
     
