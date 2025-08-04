@@ -385,6 +385,9 @@ def create_qr_codes(valid_uses, volume, end_date, color, output_folder, format, 
                 colorize_svg(filename, color, svg_precision=svg_precision)
             else:
                 img.save(filename)
+    
+    # Return the output folder path for results display
+    return output_folder
 
 def zip_output_files(output_folder, zip_file_name, format):
     with zipfile.ZipFile(zip_file_name, 'w', zipfile.ZIP_DEFLATED) as zipf:
@@ -520,9 +523,9 @@ class QRGeneratorGUI:
         self.csv_file_path = tk.StringVar(value="")
         
         # Parameter form variables
-        self.valid_uses = tk.StringVar(value="15")
-        self.volume = tk.StringVar(value="500")
-        self.end_date = tk.StringVar(value="26.12.31")
+        self.valid_uses = tk.StringVar(value="")  # Start empty - user must fill
+        self.volume = tk.StringVar(value="") # Start empty - user must fill
+        self.end_date = tk.StringVar(value="") # Start empty - user must fill
         self.color = tk.StringVar(value="#000000")
         self.security_code = tk.StringVar(value="SECD")
         self.suffix_code = tk.StringVar(value="23FF45EE")
@@ -564,8 +567,8 @@ class QRGeneratorGUI:
         # Ensure button starts disabled (force initial state)
         if hasattr(self, 'generate_button'):
             self.generate_button.configure(state="disabled")
-            # Run validation after a brief delay to check if form should be enabled
-            self.root.after(100, self.validate_form)
+            # Only enable after validation if form is truly complete
+            self.root.after(100, self.delayed_validation)
     
     def center_window(self):
         """Center the main window on the screen"""
@@ -2733,6 +2736,29 @@ class QRGeneratorGUI:
             if hasattr(self, 'generate_button'):
                 self.generate_button.configure(state="disabled")
             print(f"Form validation error: {e}")
+    
+    def delayed_validation(self):
+        """Delayed validation check for startup"""
+        try:
+            # Only run validation if all default values are actually set
+            if (self.valid_uses.get().strip() and 
+                self.volume.get().strip() and 
+                self.end_date.get().strip() and 
+                self.color.get().strip() and 
+                self.security_code.get().strip() and 
+                self.suffix_code.get().strip() and
+                self.output_directory.get().strip()):
+                self.validate_form()
+            else:
+                # Keep button disabled if any required field is empty
+                if hasattr(self, 'generate_button'):
+                    self.generate_button.configure(state="disabled")
+                if hasattr(self, 'status_label'):
+                    self.status_label.configure(text="Form incomplete: Fill all required fields", text_color="orange")
+        except Exception as e:
+            if hasattr(self, 'generate_button'):
+                self.generate_button.configure(state="disabled")
+            print(f"Delayed validation error: {e}")
 
 
 def main():
