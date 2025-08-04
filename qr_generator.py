@@ -584,15 +584,10 @@ class QRGeneratorGUI:
     
     def create_placeholder_sections(self):
         """Create placeholder sections for development"""
-        # Operation Mode Section (Task 22)
-        mode_frame = ctk.CTkFrame(self.content_frame)
-        mode_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
-        mode_frame.grid_columnconfigure(1, weight=1)
+        # Operation Mode Section (Task 22) - IMPLEMENTED
+        self.create_operation_mode_section()
         
-        ctk.CTkLabel(mode_frame, text="Operation Mode:", font=ctk.CTkFont(weight="bold")).grid(
-            row=0, column=0, padx=20, pady=15, sticky="w")
-        ctk.CTkLabel(mode_frame, text="[Coming in Task 22]", text_color="gray").grid(
-            row=0, column=1, padx=20, pady=15, sticky="w")
+        # Additional placeholder sections for other tasks
         
         # Preset Management Section (Task 23)
         preset_frame = ctk.CTkFrame(self.content_frame)
@@ -638,6 +633,50 @@ class QRGeneratorGUI:
         )
         self.status_label.grid(row=0, column=0, padx=20, pady=15, sticky="w")
     
+    def create_operation_mode_section(self):
+        """Create operation mode selection with clear radio buttons (Task 22)"""
+        mode_frame = ctk.CTkFrame(self.content_frame)
+        mode_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
+        mode_frame.grid_columnconfigure(1, weight=1)
+        
+        # Section title
+        ctk.CTkLabel(
+            mode_frame, 
+            text="Generation Mode:", 
+            font=ctk.CTkFont(weight="bold", size=16)
+        ).grid(row=0, column=0, columnspan=3, padx=20, pady=(15, 10), sticky="w")
+        
+        # Radio buttons for operation modes
+        self.mode_single = ctk.CTkRadioButton(
+            mode_frame,
+            text="Single Generation\nGenerate 1 or a few QR codes with same parameters",
+            variable=self.operation_mode,
+            value="single",
+            font=ctk.CTkFont(size=12)
+        )
+        self.mode_single.grid(row=1, column=0, padx=20, pady=5, sticky="w")
+        
+        self.mode_batch = ctk.CTkRadioButton(
+            mode_frame,
+            text="Batch Sequential Generation\nGenerate multiple QR codes with sequential numbering",
+            variable=self.operation_mode,
+            value="batch",
+            font=ctk.CTkFont(size=12)
+        )
+        self.mode_batch.grid(row=1, column=1, padx=20, pady=5, sticky="w")
+        
+        self.mode_csv = ctk.CTkRadioButton(
+            mode_frame,
+            text="CSV Import\nGenerate QR codes from data in a CSV file",
+            variable=self.operation_mode,
+            value="csv",
+            font=ctk.CTkFont(size=12)
+        )
+        self.mode_csv.grid(row=1, column=2, padx=20, pady=5, sticky="w")
+        
+        # Add some spacing
+        mode_frame.grid_rowconfigure(2, minsize=15)
+    
     def init_default_values(self):
         """Initialize default values for the form"""
         # Set default operation mode
@@ -651,7 +690,9 @@ class QRGeneratorGUI:
     
     def generate_qr_codes(self):
         """Main action - generate QR codes (placeholder for Task 30)"""
-        self.status_label.configure(text="QR code generation coming in Task 30...")
+        selected_mode = self.operation_mode.get()
+        mode_names = {"single": "Single Generation", "batch": "Batch Sequential", "csv": "CSV Import"}
+        self.status_label.configure(text=f"Selected: {mode_names[selected_mode]} - Full integration coming in Task 30...")
         # TODO: Implement in Task 30 - Main window workflow integration
     
     def run(self):
