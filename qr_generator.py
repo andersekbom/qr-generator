@@ -557,6 +557,9 @@ class QRGeneratorGUI:
         
         # Load saved configuration (Task 34)
         self.load_configuration()
+        
+        # Setup form validation
+        self.setup_form_validation()
     
     def center_window(self):
         """Center the main window on the screen"""
@@ -781,13 +784,14 @@ class QRGeneratorGUI:
         footer_frame.grid(row=2, column=0, sticky="ew", padx=20, pady=(10, 20))
         footer_frame.grid_columnconfigure(1, weight=1)
         
-        # Generate button
+        # Generate button (starts disabled until form is valid)
         self.generate_button = ctk.CTkButton(
             footer_frame,
             text="Generate QR Codes",
             font=ctk.CTkFont(size=16, weight="bold"),
             height=40,
-            command=self.generate_qr_codes
+            command=self.generate_qr_codes,
+            state="disabled"
         )
         self.generate_button.grid(row=0, column=2, padx=20, pady=15, sticky="e")
         
@@ -1137,6 +1141,8 @@ class QRGeneratorGUI:
             if file_path:
                 self.csv_file_path.set(file_path)
                 self.detect_csv_properties(file_path)
+                # Trigger validation after CSV file selection
+                self.validate_form()
         except Exception as e:
             self.preset_status.configure(text=f"❌ Error selecting file: {e}", text_color="red")
     
@@ -1287,12 +1293,16 @@ class QRGeneratorGUI:
             self.show_format_section(True)  # CSV mode also needs format options
             self.show_output_section(True)  # All modes need output options
             self.status_label.configure(text="CSV mode selected - choose a CSV file to import data")
+            # Trigger validation after mode change
+            self.validate_form()
         elif mode == "manual":
             self.show_csv_section(False)
             self.show_parameter_section(True)
             self.show_format_section(True)  # Manual mode needs format options
             self.show_output_section(True)  # All modes need output options
             self.status_label.configure(text="Manual mode selected - enter QR code parameters (set count: 1 for single, multiple for batch)")
+            # Trigger validation after mode change
+            self.validate_form()
     
     def create_parameter_forms_section(self):
         """Create parameter input forms with validation (Task 25)"""
@@ -1894,6 +1904,10 @@ class QRGeneratorGUI:
         # Initialize count entry with default value
         self.count_entry.delete(0, 'end')
         self.count_entry.insert(0, "1")
+        
+        # Disable Generate button initially (will be enabled by validation if form is complete)
+        if hasattr(self, 'generate_button'):
+            self.generate_button.configure(state="disabled")
     
     def toggle_theme(self):
         """Toggle between light and dark themes"""
@@ -2344,6 +2358,8 @@ class QRGeneratorGUI:
             # Update UI
             self.on_mode_change()
             self.status_label.configure(text="Form cleared", text_color="blue")
+            # Trigger validation after clearing form
+            self.validate_form()
         except Exception as e:
             self.status_label.configure(text=f"Error clearing form: {str(e)}", text_color="red")
     
@@ -2568,6 +2584,136 @@ class QRGeneratorGUI:
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         
         self.root.mainloop()
+    
+    def setup_form_validation(self):
+        """Setup form validation to enable/disable Generate button"""
+        try:
+            # Bind validation to all form fields that affect generation
+            validation_vars = [
+                self.operation_mode, self.valid_uses, self.volume, self.end_date,
+                self.color, self.security_code, self.suffix_code, self.count,
+                self.format, self.qr_version, self.error_correction, self.box_size,
+                self.border, self.png_quality, self.svg_precision, self.output_directory,
+                self.csv_file_path
+            ]
+            
+            # Bind validation to StringVar and IntVar changes
+            for var in validation_vars:
+                if hasattr(var, 'trace_add'):
+                    var.trace_add('write', self.validate_form)
+                else:  # Fallback for older tkinter versions
+                    var.trace('w', self.validate_form)
+            
+            # Initial validation
+            self.validate_form()
+            
+        except Exception as e:
+            print(f"Form validation setup failed: {e}")
+    
+    def validate_form(self, *args):
+        """Validate form and enable/disable Generate button"""
+        try:
+            is_valid = True
+            error_message = ""
+            
+            mode = self.operation_mode.get()
+            
+            if mode == "csv":
+                # CSV mode validation
+                csv_path = self.csv_file_path.get().strip()
+                if not csv_path:
+                    is_valid = False
+                    error_message = "Please select a CSV file"
+                elif not os.path.exists(csv_path):
+                    is_valid = False
+                    error_message = "Selected CSV file does not exist"
+            
+            elif mode == "manual":
+                # Manual mode validation
+                required_fields = {
+                    "Valid Uses": self.valid_uses.get().strip(),
+                    "Volume": self.volume.get().strip(), 
+                    "End Date": self.end_date.get().strip(),
+                    "Color": self.color.get().strip(),
+                    "Security Code": self.security_code.get().strip(),
+                    "Suffix Code": self.suffix_code.get().strip()
+                }
+                
+                # Check required fields are not empty
+                for field_name, value in required_fields.items():
+                    if not value:
+                        is_valid = False
+                        error_message = f"{field_name} is required"
+                        break
+                
+                # Validate numeric fields
+                if is_valid:
+                    try:
+                        valid_uses = int(self.valid_uses.get())
+                        if valid_uses < 1:
+                            is_valid = False
+                            error_message = "Valid Uses must be at least 1"
+                    except ValueError:
+                        is_valid = False
+                        error_message = "Valid Uses must be a number"
+                
+                if is_valid:
+                    try:
+                        volume = int(self.volume.get())
+                        if volume < 1:
+                            is_valid = False
+                            error_message = "Volume must be at least 1"
+                    except ValueError:
+                        is_valid = False
+                        error_message = "Volume must be a number"
+                
+                if is_valid:
+                    try:
+                        count = int(self.count.get())
+                        if count < 1:
+                            is_valid = False
+                            error_message = "Count must be at least 1"
+                    except ValueError:
+                        is_valid = False
+                        error_message = "Count must be a number"
+                
+                # Validate date format (basic check)
+                if is_valid:
+                    date_str = self.end_date.get().strip()
+                    if not date_str or len(date_str) < 6:
+                        is_valid = False
+                        error_message = "End Date must be in format DD.MM.YY"
+                
+                # Validate color format
+                if is_valid:
+                    color = self.color.get().strip()
+                    if not color.startswith('#') or len(color) != 7:
+                        is_valid = False
+                        error_message = "Color must be in #RRGGBB format"
+            
+            # Common validations for both modes
+            if is_valid:
+                output_dir = self.output_directory.get().strip()
+                if not output_dir:
+                    is_valid = False
+                    error_message = "Output directory is required"
+            
+            # Update Generate button state
+            if hasattr(self, 'generate_button'):
+                if is_valid:
+                    self.generate_button.configure(state="normal")
+                    if hasattr(self, 'status_label'):
+                        self.status_label.configure(text="Ready to generate QR codes", text_color="gray")
+                else:
+                    self.generate_button.configure(state="disabled")
+                    if hasattr(self, 'status_label'):
+                        self.status_label.configure(text=f"Form incomplete: {error_message}", text_color="orange")
+            
+        except Exception as e:
+            # On validation error, disable button
+            if hasattr(self, 'generate_button'):
+                self.generate_button.configure(state="disabled")
+            print(f"Form validation error: {e}")
 
 
 def main():
