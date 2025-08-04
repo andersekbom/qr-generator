@@ -560,6 +560,12 @@ class QRGeneratorGUI:
         
         # Setup form validation
         self.setup_form_validation()
+        
+        # Ensure button starts disabled (force initial state)
+        if hasattr(self, 'generate_button'):
+            self.generate_button.configure(state="disabled")
+            # Run validation after a brief delay to check if form should be enabled
+            self.root.after(100, self.validate_form)
     
     def center_window(self):
         """Center the main window on the screen"""
@@ -2036,7 +2042,7 @@ class QRGeneratorGUI:
                 input_column=self.csv_column.get(),  # Use selected column from preview table
                 security_code=self.security_code.get(),
                 suffix_code=self.suffix_code.get(),
-                qr_version=int(self.qr_version.get()) if self.qr_version.get() else None,
+                qr_version=int(self.qr_version.get()) if self.qr_version.get() and self.qr_version.get() != "auto" else None,
                 error_correction=self.error_correction.get(),
                 box_size=int(self.box_size.get()),
                 border=int(self.border.get()),
@@ -2087,7 +2093,7 @@ class QRGeneratorGUI:
                 csv_data=None,
                 security_code=self.security_code.get(),
                 suffix_code=self.suffix_code.get(),
-                qr_version=int(self.qr_version.get()) if self.qr_version.get() else None,
+                qr_version=int(self.qr_version.get()) if self.qr_version.get() and self.qr_version.get() != "auto" else None,
                 error_correction=self.error_correction.get(),
                 box_size=int(self.box_size.get()),
                 border=int(self.border.get()),
@@ -2690,6 +2696,19 @@ class QRGeneratorGUI:
                     if not color.startswith('#') or len(color) != 7:
                         is_valid = False
                         error_message = "Color must be in #RRGGBB format"
+                
+                # Validate QR version (if not auto)
+                if is_valid:
+                    qr_version = self.qr_version.get().strip()
+                    if qr_version and qr_version != "auto":
+                        try:
+                            version_num = int(qr_version)
+                            if version_num < 1 or version_num > 40:
+                                is_valid = False
+                                error_message = "QR Version must be between 1-40 or 'auto'"
+                        except ValueError:
+                            is_valid = False
+                            error_message = "QR Version must be a number between 1-40 or 'auto'"
             
             # Common validations for both modes
             if is_valid:
