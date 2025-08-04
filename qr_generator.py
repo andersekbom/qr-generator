@@ -519,6 +519,15 @@ class QRGeneratorGUI:
         self.selected_preset = tk.StringVar(value="")
         self.csv_file_path = tk.StringVar(value="")
         
+        # Parameter form variables
+        self.valid_uses = tk.StringVar(value="15")
+        self.volume = tk.StringVar(value="500")
+        self.end_date = tk.StringVar(value="26.12.31")
+        self.color = tk.StringVar(value="#000000")
+        self.security_code = tk.StringVar(value="SECD")
+        self.suffix_code = tk.StringVar(value="23FF45EE")
+        self.count = tk.IntVar(value=1)
+        
         # Create main layout
         self.create_main_layout()
         
@@ -593,8 +602,11 @@ class QRGeneratorGUI:
         # CSV File Selection Section (Task 24) - IMPLEMENTED
         self.create_csv_file_section()
         
+        # Parameter Input Forms Section (Task 25) - IMPLEMENTED
+        self.create_parameter_forms_section()
+        
         # Additional placeholder sections for other tasks
-        # TODO: Task 25-35 sections will be added here
+        # TODO: Task 26-35 sections will be added here
     
     def create_footer_section(self):
         """Create footer with main action buttons"""
@@ -949,14 +961,211 @@ class QRGeneratorGUI:
         """Handle operation mode changes to show/hide relevant sections"""
         mode = self.operation_mode.get()
         
-        # Show/hide CSV section based on mode
+        # Show/hide sections based on mode
         if mode == "csv":
             self.show_csv_section(True)
+            self.show_parameter_section(False)
             self.status_label.configure(text="CSV mode selected - choose a CSV file to import data")
         else:
             self.show_csv_section(False)
+            self.show_parameter_section(True)
             mode_names = {"single": "Single Generation", "batch": "Batch Sequential"}
-            self.status_label.configure(text=f"{mode_names[mode]} mode selected")
+            self.status_label.configure(text=f"{mode_names[mode]} mode selected - enter QR code parameters")
+            
+            # Update count default based on mode
+            if mode == "single":
+                self.count_entry.delete(0, 'end')
+                self.count_entry.insert(0, "1")
+                self.count.set(1)
+            elif mode == "batch":
+                self.count_entry.delete(0, 'end')
+                self.count_entry.insert(0, "10")
+                self.count.set(10)
+    
+    def create_parameter_forms_section(self):
+        """Create parameter input forms with validation (Task 25)"""
+        self.params_frame = ctk.CTkFrame(self.content_frame)
+        self.params_frame.grid(row=3, column=0, sticky="ew", padx=10, pady=10)
+        self.params_frame.grid_columnconfigure(1, weight=1)
+        self.params_frame.grid_columnconfigure(3, weight=1)
+        
+        # Section title
+        ctk.CTkLabel(
+            self.params_frame, 
+            text="QR Code Parameters:", 
+            font=ctk.CTkFont(weight="bold", size=16)
+        ).grid(row=0, column=0, columnspan=4, padx=20, pady=(15, 10), sticky="w")
+        
+        # Row 1: Valid Uses and Volume
+        ctk.CTkLabel(self.params_frame, text="Valid Uses:", font=ctk.CTkFont(size=12)).grid(
+            row=1, column=0, padx=20, pady=8, sticky="w")
+        
+        self.valid_uses_entry = ctk.CTkEntry(
+            self.params_frame,
+            textvariable=self.valid_uses,
+            width=100,
+            placeholder_text="15"
+        )
+        self.valid_uses_entry.grid(row=1, column=1, padx=10, pady=8, sticky="w")
+        
+        ctk.CTkLabel(self.params_frame, text="Volume:", font=ctk.CTkFont(size=12)).grid(
+            row=1, column=2, padx=20, pady=8, sticky="w")
+        
+        self.volume_entry = ctk.CTkEntry(
+            self.params_frame,
+            textvariable=self.volume,
+            width=100,
+            placeholder_text="500"
+        )
+        self.volume_entry.grid(row=1, column=3, padx=10, pady=8, sticky="w")
+        
+        # Row 2: End Date and Color
+        ctk.CTkLabel(self.params_frame, text="Valid Until:", font=ctk.CTkFont(size=12)).grid(
+            row=2, column=0, padx=20, pady=8, sticky="w")
+        
+        self.end_date_entry = ctk.CTkEntry(
+            self.params_frame,
+            textvariable=self.end_date,
+            width=100,
+            placeholder_text="DD.MM.YY"
+        )
+        self.end_date_entry.grid(row=2, column=1, padx=10, pady=8, sticky="w")
+        
+        ctk.CTkLabel(self.params_frame, text="Color:", font=ctk.CTkFont(size=12)).grid(
+            row=2, column=2, padx=20, pady=8, sticky="w")
+        
+        color_frame = ctk.CTkFrame(self.params_frame)
+        color_frame.grid(row=2, column=3, padx=10, pady=8, sticky="w")
+        
+        self.color_entry = ctk.CTkEntry(
+            color_frame,
+            textvariable=self.color,
+            width=100,
+            placeholder_text="#000000"
+        )
+        self.color_entry.grid(row=0, column=0, padx=5, pady=5, sticky="w")
+        
+        self.color_preview = ctk.CTkButton(
+            color_frame,
+            text="",
+            width=30,
+            height=30,
+            fg_color=self.color.get(),
+            command=self.choose_color
+        )
+        self.color_preview.grid(row=0, column=1, padx=5, pady=5, sticky="w")
+        
+        # Row 3: Security Code and Suffix Code
+        ctk.CTkLabel(self.params_frame, text="Security Code:", font=ctk.CTkFont(size=12)).grid(
+            row=3, column=0, padx=20, pady=8, sticky="w")
+        
+        self.security_entry = ctk.CTkEntry(
+            self.params_frame,
+            textvariable=self.security_code,
+            width=100,
+            placeholder_text="SECD"
+        )
+        self.security_entry.grid(row=3, column=1, padx=10, pady=8, sticky="w")
+        
+        ctk.CTkLabel(self.params_frame, text="Suffix Code:", font=ctk.CTkFont(size=12)).grid(
+            row=3, column=2, padx=20, pady=8, sticky="w")
+        
+        self.suffix_entry = ctk.CTkEntry(
+            self.params_frame,
+            textvariable=self.suffix_code,
+            width=100,
+            placeholder_text="23FF45EE"
+        )
+        self.suffix_entry.grid(row=3, column=3, padx=10, pady=8, sticky="w")
+        
+        # Row 4: Count
+        ctk.CTkLabel(self.params_frame, text="Count:", font=ctk.CTkFont(size=12)).grid(
+            row=4, column=0, padx=20, pady=8, sticky="w")
+        
+        count_frame = ctk.CTkFrame(self.params_frame)
+        count_frame.grid(row=4, column=1, padx=10, pady=8, sticky="w")
+        
+        self.count_entry = ctk.CTkEntry(
+            count_frame,
+            width=80,
+            placeholder_text="1"
+        )
+        self.count_entry.grid(row=0, column=0, padx=5, pady=5, sticky="w")
+        
+        # Count adjustment buttons
+        self.count_minus_btn = ctk.CTkButton(
+            count_frame,
+            text="-",
+            width=30,
+            command=self.decrease_count
+        )
+        self.count_minus_btn.grid(row=0, column=1, padx=2, pady=5, sticky="w")
+        
+        self.count_plus_btn = ctk.CTkButton(
+            count_frame,
+            text="+",
+            width=30,
+            command=self.increase_count
+        )
+        self.count_plus_btn.grid(row=0, column=2, padx=2, pady=5, sticky="w")
+        
+        # Validation status
+        self.param_status = ctk.CTkLabel(
+            self.params_frame,
+            text="Enter parameters for QR code generation",
+            text_color="gray",
+            font=ctk.CTkFont(size=11)
+        )
+        self.param_status.grid(row=5, column=0, columnspan=4, padx=20, pady=(5, 15), sticky="w")
+        
+        # Initially hide the parameter section (show only for single/batch modes)
+        self.params_frame.grid_remove()
+    
+    def choose_color(self):
+        """Open color picker dialog"""
+        try:
+            from tkinter import colorchooser
+            color = colorchooser.askcolor(color=self.color.get())
+            if color[1]:  # color[1] is the hex string
+                self.color.set(color[1])
+                self.color_preview.configure(fg_color=color[1])
+        except Exception as e:
+            self.param_status.configure(text=f"❌ Color picker error: {e}", text_color="red")
+    
+    def increase_count(self):
+        """Increase count value"""
+        try:
+            current = int(self.count_entry.get() or "1")
+            if current < 10000:
+                new_value = current + 1
+                self.count_entry.delete(0, 'end')
+                self.count_entry.insert(0, str(new_value))
+                self.count.set(new_value)
+        except ValueError:
+            self.count_entry.delete(0, 'end')
+            self.count_entry.insert(0, "1")
+            self.count.set(1)
+    
+    def decrease_count(self):
+        """Decrease count value"""
+        try:
+            current = int(self.count_entry.get() or "1")
+            if current > 1:
+                new_value = current - 1
+                self.count_entry.delete(0, 'end')
+                self.count_entry.insert(0, str(new_value))
+                self.count.set(new_value)
+        except ValueError:
+            self.count_entry.delete(0, 'end')
+            self.count_entry.insert(0, "1")
+            self.count.set(1)
+    
+    def show_parameter_section(self, show=True):
+        """Show or hide the parameter forms section"""
+        if show:
+            self.params_frame.grid()
+        else:
+            self.params_frame.grid_remove()
     
     def init_default_values(self):
         """Initialize default values for the form"""
@@ -965,6 +1174,10 @@ class QRGeneratorGUI:
         
         # Set default preset selection
         self.selected_preset.set("Select preset...")
+        
+        # Initialize count entry with default value
+        self.count_entry.delete(0, 'end')
+        self.count_entry.insert(0, "1")
     
     def toggle_theme(self):
         """Toggle between light and dark themes"""
