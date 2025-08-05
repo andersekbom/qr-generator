@@ -145,41 +145,47 @@ Base file: `generate_qr_codes_gui_loop.py`
 
 ## GUI Modernization (v2.0)
 
-### Task 21: Create main window framework
+### Task 21: Create main window framework ✅ COMPLETED
 **Start**: Replace root.withdraw() with main window creation using tkinter  
 **End**: Main window displays with title, proper size, and basic layout structure  
 **Test**: Run application, verify main window appears instead of hidden window + dialogs  
-**New feature**: Replace dialog-based interface with modern main window GUI
+**New feature**: Replace dialog-based interface with modern main window GUI  
+**Status**: ✅ CustomTkinter main window (900x700) with header, scrollable content, footer sections. Theme toggle, responsive grid layout, main_legacy() fallback system implemented
 
-### Task 22: Implement operation mode selection panel
+### Task 22: Implement operation mode selection panel ✅ COMPLETED
 **Start**: Create radio buttons or button panel for operation mode selection  
 **End**: User can select between "Single Generation", "Batch Sequential", "CSV Import" using buttons  
 **Test**: Click different operation modes, verify selection is captured correctly  
-**Replaces**: messagebox.askyesno("Operation Mode") and messagebox.askyesno("Batch Mode")
+**Replaces**: messagebox.askyesno("Operation Mode") and messagebox.askyesno("Batch Mode")  
+**Status**: ✅ Three clear radio buttons with descriptive text. Dynamic section visibility based on mode selection. Mode-aware status updates and count defaults implemented
 
-### Task 23: Add preset management panel
+### Task 23: Add preset management panel ✅ COMPLETED
 **Start**: Create preset section with dropdown and management buttons  
 **End**: User can load, save, delete presets using dropdown + buttons instead of dialogs  
 **Test**: Create preset, load preset, delete preset - all via GUI controls  
-**Replaces**: messagebox.askyesno("Presets") and preset management dialogs
+**Replaces**: messagebox.askyesno("Presets") and preset management dialogs  
+**Status**: ✅ Dropdown with auto-refresh, Load/Save/Delete buttons, color-coded status feedback, safe deletion with confirmation, integration with existing preset functions
 
-### Task 24: Implement CSV file selection widget
+### Task 24: Implement CSV file selection widget ✅ COMPLETED
 **Start**: Add file selection section with browse button and path display  
 **End**: User can select CSV file via button, see selected file path in widget  
 **Test**: Click browse, select CSV file, verify path displays correctly  
-**Replaces**: filedialog.askopenfilename() in CSV mode
+**Replaces**: filedialog.askopenfilename() in CSV mode  
+**Status**: ✅ File path display, browse/clear buttons, automatic delimiter detection with user-friendly display, column selection, header skip option, appears only in CSV mode
 
-### Task 25: Create parameter input forms
+### Task 25: Create parameter input forms ✅ COMPLETED
 **Start**: Add form sections for manual parameter input (uses, volume, date, etc.)  
 **End**: Text fields and dropdowns for all manual parameters with validation  
 **Test**: Enter parameters in form, verify validation works and values are captured  
-**Replaces**: simpledialog.askstring() calls for manual parameters
+**Replaces**: simpledialog.askstring() calls for manual parameters  
+**Status**: ✅ Complete 4x2 grid form with all QR parameters: Valid Uses, Volume, Valid Until, Color (with picker), Security Code, Suffix Code, Count (with +/- buttons). Mode-aware visibility
 
-### Task 26: Add format and advanced options panel
+### Task 26: Add format and advanced options panel ✅ COMPLETED
 **Start**: Create collapsible section for format selection and advanced QR options  
 **End**: Format radio buttons, quality/precision sliders, QR parameter controls  
 **Test**: Change format, verify format-specific options appear/hide correctly  
-**Replaces**: format selection dialogs and advanced parameter dialogs
+**Replaces**: format selection dialogs and advanced parameter dialogs  
+**Status**: ✅ PNG/SVG radio buttons, dynamic format-specific options (PNG quality, SVG precision sliders), collapsible advanced QR options (version, error correction, box size, border)
 
 ### Task 27: Implement filename customization section
 **Start**: Add filename options with prefix/suffix fields and checkboxes  
@@ -187,11 +193,12 @@ Base file: `generate_qr_codes_gui_loop.py`
 **Test**: Change filename options, verify custom naming works correctly  
 **Replaces**: filename customization dialogs
 
-### Task 28: Create output configuration panel
+### Task 28: Create output configuration panel ✅ COMPLETED
 **Start**: Add output directory selection and zip options  
 **End**: Directory browse button, zip checkbox, cleanup options in main window  
 **Test**: Select output directory, toggle zip option, verify settings work  
-**Replaces**: output directory and zip file dialogs
+**Replaces**: output directory and zip file dialogs  
+**Status**: ✅ Output directory browse/reset, ZIP checkbox with dynamic filename entry, auto-generation of ZIP names, cleanup options, real-time status feedback
 
 ### Task 29: Add progress and status display
 **Start**: Create progress bar and status text area in main window  
