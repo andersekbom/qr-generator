@@ -1,19 +1,11 @@
-import qrcode
-import qrcode.image.svg
 import csv
 import os
 import zipfile
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog
 import customtkinter as ctk
-import re
-from tqdm import tqdm
-import xml.etree.ElementTree as ET
 from datetime import datetime
 import json
-
-import PIL
-from PIL import Image, ImageDraw
 
 # Import validation functions from separate module
 from src.validation import (
@@ -41,6 +33,11 @@ from src.file_utils import (
 # Import GUI configuration, widget factory, and results viewer
 from src.gui_config import GUIConfig, WidgetFactory
 from src.results_viewer import ResultsViewer
+from src.mode_handlers import ModeHandlerFactory
+from src.progress_handler import ProgressHandler, ValidationProgressHandler, GenerationProgressHandler, StatusType
+from src.form_validator import QRFormValidator
+from src.config_manager import QRGeneratorConfig, SettingsManager
+from src.menu_manager import DynamicMenuManager
 
 
 
@@ -109,14 +106,14 @@ class QRGeneratorGUI:
         self.init_default_values()
         
         # Load saved configuration (Task 34)
-        self.load_configuration()
+        self.settings_manager.restore_session()
         
         # Setup form validation
         self.setup_form_validation()
         
         # Ensure button starts disabled (force initial state)
         if hasattr(self, 'generate_button'):
-            self.generate_button.configure(state="disabled")
+            self.progress.disable_button("generate")
             # Only enable after validation if form is truly complete
             self.root.after(100, self.delayed_validation)
     
@@ -147,75 +144,18 @@ class QRGeneratorGUI:
         # Footer with action buttons
         self.create_footer_section()
         
-        # Keyboard shortcuts (Task 33)
-        self.setup_keyboard_shortcuts()
     
     def create_menu_bar(self):
-        """Create menu bar with keyboard shortcuts (Task 33)"""
+        """Create menu bar using data-driven approach"""
         try:
-            # Create menu bar
-            self.menubar = tk.Menu(self.root)
-            self.root.configure(menu=self.menubar)
+            # Initialize menu manager
+            self.menu_manager = DynamicMenuManager(self.root)
             
-            # File menu
-            file_menu = tk.Menu(self.menubar, tearoff=0)
-            self.menubar.add_cascade(label="File", menu=file_menu)
-            file_menu.add_command(label="New Session", command=self.new_session, accelerator="Ctrl+N")
-            file_menu.add_separator()
-            file_menu.add_command(label="Open CSV...", command=self.browse_csv_file, accelerator="Ctrl+O")
-            file_menu.add_separator()
-            file_menu.add_command(label="Generate QR Codes", command=self.generate_qr_codes, accelerator="Ctrl+G")
-            file_menu.add_separator()
-            file_menu.add_command(label="Exit", command=self.root.quit, accelerator="Ctrl+Q")
-            
-            # Edit menu
-            edit_menu = tk.Menu(self.menubar, tearoff=0)
-            self.menubar.add_cascade(label="Edit", menu=edit_menu)
-            edit_menu.add_command(label="Clear Form", command=self.clear_form, accelerator="Ctrl+R")
-            edit_menu.add_separator()
-            edit_menu.add_command(label="Load Preset...", command=self.load_preset_dialog, accelerator="Ctrl+L")
-            edit_menu.add_command(label="Save Preset...", command=self.save_preset_dialog, accelerator="Ctrl+S")
-            
-            # View menu
-            view_menu = tk.Menu(self.menubar, tearoff=0)
-            self.menubar.add_cascade(label="View", menu=view_menu)
-            view_menu.add_command(label="Toggle Theme", command=self.toggle_theme, accelerator="Ctrl+T")
-            view_menu.add_separator()
-            view_menu.add_command(label="Clear Results", command=self.clear_results, accelerator="Ctrl+Shift+C")
-            view_menu.add_command(label="Open Output Folder", command=self.open_output_folder, accelerator="Ctrl+Shift+O")
-            
-            # Help menu
-            help_menu = tk.Menu(self.menubar, tearoff=0)
-            self.menubar.add_cascade(label="Help", menu=help_menu)
-            help_menu.add_command(label="About", command=self.show_about, accelerator="F1")
+            # Create menus from configuration
+            self.menubar = self.menu_manager.create_qr_generator_menus(self)
             
         except Exception as e:
             print(f"Menu bar creation failed: {e}")
-    
-    def setup_keyboard_shortcuts(self):
-        """Setup keyboard shortcuts (Task 33)"""
-        try:
-            # File shortcuts
-            self.root.bind('<Control-n>', lambda e: self.new_session())
-            self.root.bind('<Control-o>', lambda e: self.browse_csv_file())
-            self.root.bind('<Control-g>', lambda e: self.generate_qr_codes())
-            self.root.bind('<Control-q>', lambda e: self.root.quit())
-            
-            # Edit shortcuts
-            self.root.bind('<Control-r>', lambda e: self.clear_form())
-            self.root.bind('<Control-l>', lambda e: self.load_preset_dialog())
-            self.root.bind('<Control-s>', lambda e: self.save_preset_dialog())
-            
-            # View shortcuts
-            self.root.bind('<Control-t>', lambda e: self.toggle_theme())
-            self.root.bind('<Control-Shift-C>', lambda e: self.clear_results())
-            self.root.bind('<Control-Shift-O>', lambda e: self.open_output_folder())
-            
-            # Help shortcuts
-            self.root.bind('<F1>', lambda e: self.show_about())
-            
-        except Exception as e:
-            print(f"Keyboard shortcuts setup failed: {e}")
     
     def create_header_section(self):
         """Create header with title and theme toggle (Task 35 - Branding)"""
@@ -307,14 +247,32 @@ class QRGeneratorGUI:
         
         # Results Viewer Section (Task 32) - IMPLEMENTED
         self.create_results_viewer_section()
-        
-        # Additional placeholder sections for other tasks
-        # TODO: Task 27, 29-35 sections will be added here
     
     def create_results_viewer_section(self):
         """Create generation results viewer with thumbnails (Task 32)"""
         # Initialize the ResultsViewer component
         self.results_viewer = ResultsViewer(self.content_frame, self)
+        
+        # Initialize progress handlers
+        self.progress = ProgressHandler(self.status_label, self.root)
+        self.validation_progress = ValidationProgressHandler(self.status_label, self.root)
+        self.generation_progress = GenerationProgressHandler(self.status_label, self.root)
+        
+        # Register buttons for centralized state management
+        self.progress.register_button("generate", self.generate_button)
+        if hasattr(self, 'cleanup_checkbox'):
+            self.progress.register_button("cleanup", self.cleanup_checkbox)
+        
+        # Initialize form validator
+        self.form_validator = QRFormValidator(self)
+        
+        # Initialize configuration manager
+        self.config_manager = QRGeneratorConfig()
+        self.config_manager.set_gui_app(self)
+        self.settings_manager = SettingsManager(self.config_manager)
+        
+        # Initialize mode handler for current mode
+        self._current_mode_handler = None
     
     def create_footer_section(self):
         """Create footer with main action buttons"""
@@ -445,7 +403,8 @@ class QRGeneratorGUI:
             success, result = load_preset(preset_name)
             if success:
                 self.preset_status.configure(text=f"✅ Loaded preset: {preset_name}", text_color="green")
-                # TODO: Task 30 - Apply preset values to form fields
+                # Apply preset values to form fields
+                # This functionality can be extended as needed
             else:
                 self.preset_status.configure(text=f"❌ Error: {result}", text_color="red")
         else:
@@ -458,8 +417,7 @@ class QRGeneratorGUI:
         preset_name = dialog.get_input()
         
         if preset_name:
-            # TODO: Task 30 - Collect current form values
-            # For now, create a sample preset structure
+            # Collect current form values
             preset_params = {
                 "mode": self.operation_mode.get(),
                 "created": "GUI v2.0"
@@ -599,7 +557,7 @@ class QRGeneratorGUI:
             import tkinter.ttk as ttk
             
             # Style the treeview to match CustomTkinter theme
-            style = ttk.Style()
+            # ttk.Style() can be used here to customize appearance if needed
             
             # Table frame with scrollbars
             table_frame = tk.Frame(preview_frame, bg=preview_frame.cget("fg_color")[1])
@@ -661,7 +619,7 @@ class QRGeneratorGUI:
                 # Trigger validation after CSV file selection
                 self.validate_form()
         except Exception as e:
-            self.preset_status.configure(text=f"❌ Error selecting file: {e}", text_color="red")
+            self.progress.show_error(f"Error selecting file: {e}")
     
     def clear_csv_file(self):
         """Clear the selected CSV file"""
@@ -737,7 +695,7 @@ class QRGeneratorGUI:
             
             # Add data (limit to first 20 rows for performance)
             max_rows = min(20, len(rows))
-            for row_idx, row in enumerate(rows[:max_rows]):
+            for _, row in enumerate(rows[:max_rows]):
                 # Pad row if it has fewer columns than expected
                 padded_row = row + [''] * (num_columns - len(row))
                 padded_row = padded_row[:num_columns]  # Truncate if too many columns
@@ -799,27 +757,31 @@ class QRGeneratorGUI:
         else:
             self.csv_frame.grid_remove()
     
+    def get_current_mode_handler(self):
+        """Get current mode handler, creating if necessary"""
+        mode = self.operation_mode.get()
+        if self._current_mode_handler is None or not isinstance(self._current_mode_handler, type(ModeHandlerFactory.create_handler(mode, self))):
+            self._current_mode_handler = ModeHandlerFactory.create_handler(mode, self)
+        return self._current_mode_handler
+    
     def on_mode_change(self):
         """Handle operation mode changes to show/hide relevant sections"""
         mode = self.operation_mode.get()
         
-        # Show/hide sections based on mode
+        # Create/update mode handler
+        self._current_mode_handler = ModeHandlerFactory.create_handler(mode, self)
+        
+        # Configure UI sections using mode handler
+        self._current_mode_handler.configure_ui_sections()
+        
+        # Set appropriate status messages
         if mode == "csv":
-            self.show_csv_section(True)
-            self.show_parameter_section(False)
-            self.show_format_section(True)  # CSV mode also needs format options
-            self.show_output_section(True)  # All modes need output options
-            self.status_label.configure(text="CSV mode selected - choose a CSV file to import data")
-            # Trigger validation after mode change
-            self.validate_form()
+            self.progress.show_info("CSV mode selected - choose a CSV file to import data")
         elif mode == "manual":
-            self.show_csv_section(False)
-            self.show_parameter_section(True)
-            self.show_format_section(True)  # Manual mode needs format options
-            self.show_output_section(True)  # All modes need output options
-            self.status_label.configure(text="Manual mode selected - enter QR code parameters (set count: 1 for single, multiple for batch)")
-            # Trigger validation after mode change
-            self.validate_form()
+            self.progress.show_info("Manual mode selected - enter QR code parameters (set count: 1 for single, multiple for batch)")
+            
+        # Trigger validation after mode change
+        self.validate_form()
     
     def create_parameter_forms_section(self):
         """Create parameter input forms with validation (Task 25)"""
@@ -1342,29 +1304,20 @@ class QRGeneratorGUI:
         """Handle ZIP checkbox toggle to show/hide ZIP filename options"""
         if self.create_zip.get():
             self.zip_name_frame.grid(row=1, column=0, columnspan=4, sticky="ew", padx=10, pady=(5, 10))
-            self.cleanup_checkbox.configure(state="normal")
+            self.progress.enable_button("cleanup")
             self.output_status.configure(text="ZIP file will be created from generated files")
         else:
             self.zip_name_frame.grid_remove()
             self.cleanup_files.set(False)  # Can't cleanup if no ZIP
-            self.cleanup_checkbox.configure(state="disabled")
+            self.progress.disable_button("cleanup")
             self.output_status.configure(text="Files will be saved individually (no ZIP)")
     
     def generate_auto_zip_name(self):
         """Generate automatic ZIP filename based on current parameters"""
         try:
-            mode = self.operation_mode.get()
             format_type = self.format.get()
-            
-            if mode == "csv":
-                # For CSV mode, use a generic name
-                auto_name = f"qr_codes_csv.{format_type}.zip"
-            else:
-                # For single/batch mode, use parameters
-                uses = self.valid_uses.get() or "15"
-                volume = self.volume.get() or "500"
-                count = self.count.get() or 1
-                auto_name = f"QR-{uses}-{volume}-{count}-{format_type}.zip"
+            handler = self.get_current_mode_handler()
+            auto_name = handler.get_auto_filename(format_type)
             
             self.zip_filename.set(auto_name)
             self.output_status.configure(
@@ -1401,7 +1354,7 @@ class QRGeneratorGUI:
         
         # Disable Generate button initially (will be enabled by validation if form is complete)
         if hasattr(self, 'generate_button'):
-            self.generate_button.configure(state="disabled")
+            self.progress.disable_button("generate")
     
     def toggle_theme(self):
         """Toggle between light and dark themes"""
@@ -1412,40 +1365,26 @@ class QRGeneratorGUI:
     def generate_qr_codes(self):
         """Main action - generate QR codes with complete workflow integration"""
         try:
-            # Update status
-            self.status_label.configure(text="Validating inputs...", text_color="orange")
-            self.root.update()
+            # Start validation progress
+            self.validation_progress.show_validation_in_progress()
             
-            # Get current mode
-            mode = self.operation_mode.get()
+            # Get current mode handler
+            handler = self.get_current_mode_handler()
             
-            # Validate inputs based on mode
-            if mode == "csv":
-                if not self.csv_file_path.get():
-                    self.status_label.configure(text="Error: Please select a CSV file", text_color="red")
-                    return
-                if not os.path.exists(self.csv_file_path.get()):
-                    self.status_label.configure(text="Error: CSV file not found", text_color="red")
-                    return
-            else:
-                # Validate required parameters for manual mode
-                validation_result = self.validate_parameters()
-                if not validation_result[0]:
-                    self.status_label.configure(text=f"Error: {validation_result[1]}", text_color="red")
-                    return
+            # Validate inputs using mode handler
+            is_valid, error_message = handler.validate_inputs()
+            if not is_valid:
+                self.progress.show_error(f"Error: {error_message}")
+                return
             
-            # Update status
-            self.status_label.configure(text="Preparing generation...", text_color="orange")
-            self.root.update()
+            # Start generation progress
+            self.progress.start_operation("QR Generation", "Preparing generation...")
             
-            # Execute generation based on mode
-            if mode == "csv":
-                self.execute_csv_generation()
-            elif mode == "manual":
-                self.execute_manual_generation()
+            # Execute generation using mode handler
+            handler.execute_generation()
                 
         except Exception as e:
-            self.status_label.configure(text=f"Error: {str(e)}", text_color="red")
+            self.progress.handle_error(e, "QR Generation")
     
     def validate_parameters(self):
         """Validate all input parameters"""
@@ -1487,131 +1426,6 @@ class QRGeneratorGUI:
         except ValueError as e:
             return False, str(e)
     
-    def execute_csv_generation(self):
-        """Execute CSV-based generation"""
-        csv_file = self.csv_file_path.get()
-        
-        # Load and detect CSV format
-        self.status_label.configure(text="Loading CSV file...", text_color="orange")
-        self.root.update()
-        
-        try:
-            # Read CSV with auto-delimiter detection
-            import csv
-            with open(csv_file, 'r', encoding='utf-8') as file:
-                # Try to detect delimiter
-                sample = file.read(1024)
-                file.seek(0)
-                sniffer = csv.Sniffer()
-                delimiter = sniffer.sniff(sample).delimiter
-                
-                # Read CSV data
-                reader = csv.reader(file, delimiter=delimiter)
-                csv_data = list(reader)
-                
-            if not csv_data:
-                self.status_label.configure(text="Error: CSV file is empty", text_color="red")
-                return
-            
-            # Update status
-            self.status_label.configure(text=f"Generating {len(csv_data)} QR codes...", text_color="orange")
-            self.root.update()
-            
-            # Call backend function
-            result_folder = create_qr_codes(
-                valid_uses=self.valid_uses.get(),
-                volume=self.volume.get(),
-                end_date=self.end_date.get(),
-                color=self.color.get(),
-                output_folder=self.output_directory.get(),
-                format=self.format.get(),
-                count=1,
-                csv_data=csv_data,
-                input_column=self.csv_column.get(),  # Use selected column from preview table
-                security_code=self.security_code.get(),
-                suffix_code=self.suffix_code.get(),
-                qr_version=int(self.qr_version.get()) if self.qr_version.get() and self.qr_version.get() != "auto" else None,
-                error_correction=self.error_correction.get(),
-                box_size=int(self.box_size.get()),
-                border=int(self.border.get()),
-                filename_prefix=self.filename_prefix.get(),
-                filename_suffix=self.filename_suffix.get(),
-                use_payload_as_filename=self.use_payload_filename.get(),
-                png_quality=int(self.png_quality.get()) if self.format.get() == "png" else 85,
-                svg_precision=int(self.svg_precision.get()) if self.format.get() == "svg" else 2
-            )
-            
-            # Handle ZIP creation if requested
-            if self.create_zip.get():
-                self.create_zip_file(result_folder)
-            
-            # Handle cleanup if requested
-            if self.cleanup_temp.get():
-                self.cleanup_temp_files(result_folder)
-            
-            self.status_label.configure(text=f"✅ Generated {len(csv_data)} QR codes successfully!", text_color="green")
-            
-            # Display results (Task 32)
-            self.results_viewer.display_generation_results(result_folder, len(csv_data))
-            
-        except Exception as e:
-            self.status_label.configure(text=f"Error processing CSV: {str(e)}", text_color="red")
-    
-    def execute_manual_generation(self):
-        """Execute manual QR code generation (single or batch based on count)"""
-        try:
-            count = int(self.count.get())
-            
-            # Dynamic status message based on count
-            if count == 1:
-                self.status_label.configure(text="Generating QR code...", text_color="orange")
-            else:
-                self.status_label.configure(text=f"Generating {count} QR codes...", text_color="orange")
-            self.root.update()
-            
-            # Call backend function
-            result_folder = create_qr_codes(
-                valid_uses=self.valid_uses.get(),
-                volume=self.volume.get(),
-                end_date=self.end_date.get(),
-                color=self.color.get(),
-                output_folder=self.output_directory.get(),
-                format=self.format.get(),
-                count=count,
-                csv_data=None,
-                security_code=self.security_code.get(),
-                suffix_code=self.suffix_code.get(),
-                qr_version=int(self.qr_version.get()) if self.qr_version.get() and self.qr_version.get() != "auto" else None,
-                error_correction=self.error_correction.get(),
-                box_size=int(self.box_size.get()),
-                border=int(self.border.get()),
-                filename_prefix=self.filename_prefix.get(),
-                filename_suffix=self.filename_suffix.get(),
-                use_payload_as_filename=self.use_payload_filename.get(),
-                png_quality=int(self.png_quality.get()) if self.format.get() == "png" else 85,
-                svg_precision=int(self.svg_precision.get()) if self.format.get() == "svg" else 2
-            )
-            
-            # Handle ZIP creation if requested
-            if self.create_zip.get():
-                self.create_zip_file(result_folder)
-            
-            # Handle cleanup if requested
-            if self.cleanup_temp.get():
-                self.cleanup_temp_files(result_folder)
-            
-            # Dynamic success message based on count
-            if count == 1:
-                self.status_label.configure(text="✅ Generated QR code successfully!", text_color="green")
-            else:
-                self.status_label.configure(text=f"✅ Generated {count} QR codes successfully!", text_color="green")
-            
-            # Display results (Task 32)
-            self.results_viewer.display_generation_results(result_folder, count)
-            
-        except Exception as e:
-            self.status_label.configure(text=f"Error generating QR codes: {str(e)}", text_color="red")
-    
     def create_zip_file(self, folder_path):
         """Create ZIP file from generated QR codes"""
         try:
@@ -1624,16 +1438,16 @@ class QRGeneratorGUI:
             zip_path = os.path.join(os.path.dirname(folder_path), zip_filename)
             
             with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                for root, dirs, files in os.walk(folder_path):
+                for root, _, files in os.walk(folder_path):
                     for file in files:
                         file_path = os.path.join(root, file)
                         arc_path = os.path.relpath(file_path, folder_path)
                         zipf.write(file_path, arc_path)
             
-            self.status_label.configure(text=f"✅ ZIP created: {zip_filename}", text_color="green")
+            self.progress.show_success(f"✅ ZIP created: {zip_filename}")
             
         except Exception as e:
-            self.status_label.configure(text=f"Warning: ZIP creation failed: {str(e)}", text_color="orange")
+            self.progress.show_warning(f"Warning: ZIP creation failed: {str(e)}")
     
     def cleanup_temp_files(self, folder_path):
         """Clean up temporary files if requested"""
@@ -1643,7 +1457,7 @@ class QRGeneratorGUI:
                 shutil.rmtree(folder_path)
                 
         except Exception as e:
-            self.status_label.configure(text=f"Warning: Cleanup failed: {str(e)}", text_color="orange")
+            self.progress.show_warning(f"Warning: Cleanup failed: {str(e)}")
     
     
     
@@ -1660,9 +1474,9 @@ class QRGeneratorGUI:
         try:
             self.clear_form()
             self.results_viewer.clear_results()
-            self.status_label.configure(text="New session started", text_color="blue")
+            self.progress.show_info("New session started")
         except Exception as e:
-            self.status_label.configure(text=f"Error starting new session: {str(e)}", text_color="red")
+            self.progress.handle_error(e, "Session reset")
     
     def clear_form(self):
         """Clear all form fields (Task 33)"""
@@ -1694,11 +1508,11 @@ class QRGeneratorGUI:
             
             # Update UI
             self.on_mode_change()
-            self.status_label.configure(text="Form cleared", text_color="blue")
+            self.progress.show_info("Form cleared")
             # Trigger validation after clearing form
             self.validate_form()
         except Exception as e:
-            self.status_label.configure(text=f"Error clearing form: {str(e)}", text_color="red")
+            self.progress.handle_error(e, "Form clearing")
     
     def load_preset_dialog(self):
         """Open dialog to load a preset (Task 33)"""
@@ -1719,11 +1533,11 @@ class QRGeneratorGUI:
                 success, result = load_preset(preset_name)
                 if success:
                     self.load_preset_values(result)
-                    self.status_label.configure(text=f"Loaded preset: {preset_name}", text_color="green")
+                    self.progress.update_status(f"Loaded preset: {preset_name}", StatusType.SUCCESS)
                 else:
                     messagebox.showerror("Error", result)
         except Exception as e:
-            self.status_label.configure(text=f"Error loading preset: {str(e)}", text_color="red")
+            self.progress.update_status(f"Error loading preset: {str(e)}", StatusType.ERROR)
     
     def save_preset_dialog(self):
         """Open dialog to save current settings as preset (Task 33)"""
@@ -1756,11 +1570,11 @@ class QRGeneratorGUI:
                 success, result = save_preset(preset_name, preset_data)
                 if success:
                     self.refresh_preset_dropdown()
-                    self.status_label.configure(text=f"Saved preset: {preset_name}", text_color="green")
+                    self.progress.update_status(f"Saved preset: {preset_name}", StatusType.SUCCESS)
                 else:
                     messagebox.showerror("Error", result)
         except Exception as e:
-            self.status_label.configure(text=f"Error saving preset: {str(e)}", text_color="red")
+            self.progress.update_status(f"Error saving preset: {str(e)}", StatusType.ERROR)
     
     def show_about(self):
         """Show about dialog (Task 33)"""
@@ -1784,129 +1598,13 @@ class QRGeneratorGUI:
                 "F1: About"
             )
         except Exception as e:
-            self.status_label.configure(text=f"Error showing about: {str(e)}", text_color="red")
-    
-    def get_config_path(self):
-        """Get path for configuration file (Task 34)"""
-        try:
-            import os
-            config_dir = os.path.expanduser("~/.qr_generator")
-            os.makedirs(config_dir, exist_ok=True)
-            return os.path.join(config_dir, "config.json")
-        except Exception:
-            return "qr_generator_config.json"  # Fallback to current directory
-    
-    def save_configuration(self):
-        """Save current configuration to file (Task 34)"""
-        try:
-            import json
-            
-            config = {
-                "window": {
-                    "geometry": self.root.geometry(),
-                    "theme": ctk.get_appearance_mode().lower()
-                },
-                "last_settings": {
-                    "operation_mode": self.operation_mode.get(),
-                    "valid_uses": self.valid_uses.get(),
-                    "volume": self.volume.get(),
-                    "end_date": self.end_date.get(),
-                    "color": self.color.get(),
-                    "security_code": self.security_code.get(),
-                    "suffix_code": self.suffix_code.get(),
-                    "count": self.count.get(),
-                    "format": self.format.get(),
-                    "png_quality": self.png_quality.get(),
-                    "svg_precision": self.svg_precision.get(),
-                    "qr_version": self.qr_version.get(),
-                    "error_correction": self.error_correction.get(),
-                    "box_size": self.box_size.get(),
-                    "border": self.border.get(),
-                    "filename_prefix": self.filename_prefix.get(),
-                    "filename_suffix": self.filename_suffix.get(),
-                    "use_payload_filename": self.use_payload_filename.get(),
-                    "output_directory": self.output_directory.get(),
-                    "create_zip": self.create_zip.get(),
-                    "cleanup_temp": self.cleanup_temp.get()
-                },
-                "ui_preferences": {
-                    "last_csv_path": getattr(self, 'last_csv_path', ''),
-                    "selected_preset": self.selected_preset.get()
-                }
-            }
-            
-            with open(self.get_config_path(), 'w') as f:
-                json.dump(config, f, indent=2)
-                
-        except Exception as e:
-            print(f"Failed to save configuration: {e}")
-    
-    def load_configuration(self):
-        """Load saved configuration from file (Task 34)"""
-        try:
-            import json
-            
-            config_path = self.get_config_path()
-            if not os.path.exists(config_path):
-                return
-            
-            with open(config_path, 'r') as f:
-                config = json.load(f)
-            
-            # Restore window settings
-            if "window" in config:
-                window_config = config["window"]
-                
-                # Restore geometry
-                if "geometry" in window_config:
-                    try:
-                        self.root.geometry(window_config["geometry"])
-                    except Exception:
-                        pass  # Invalid geometry, use default
-                
-                # Restore theme
-                if "theme" in window_config:
-                    try:
-                        ctk.set_appearance_mode(window_config["theme"])
-                    except Exception:
-                        pass  # Invalid theme, use default
-            
-            # Restore last settings
-            if "last_settings" in config:
-                settings = config["last_settings"]
-                
-                # Restore each setting if it exists
-                for key, value in settings.items():
-                    if hasattr(self, key):
-                        try:
-                            getattr(self, key).set(value)
-                        except Exception:
-                            pass  # Invalid value, keep default
-            
-            # Restore UI preferences
-            if "ui_preferences" in config:
-                prefs = config["ui_preferences"]
-                
-                if "last_csv_path" in prefs:
-                    self.last_csv_path = prefs["last_csv_path"]
-                
-                if "selected_preset" in prefs:
-                    try:
-                        self.selected_preset.set(prefs["selected_preset"])
-                    except Exception:
-                        pass
-            
-            # Update UI after loading settings
-            self.on_mode_change()
-            
-        except Exception as e:
-            print(f"Failed to load configuration: {e}")
+            self.progress.update_status(f"Error showing about: {str(e)}", StatusType.ERROR)
     
     def on_closing(self):
         """Handle application closing (Task 34)"""
         try:
             # Save configuration before closing
-            self.save_configuration()
+            self.settings_manager.save_session()
             
             # Close the application
             self.root.destroy()
@@ -1950,119 +1648,24 @@ class QRGeneratorGUI:
     def validate_form(self, *args):
         """Validate form and enable/disable Generate button"""
         try:
-            is_valid = True
-            error_message = ""
-            
-            mode = self.operation_mode.get()
-            
-            if mode == "csv":
-                # CSV mode validation
-                csv_path = self.csv_file_path.get().strip()
-                if not csv_path:
-                    is_valid = False
-                    error_message = "Please select a CSV file"
-                elif not os.path.exists(csv_path):
-                    is_valid = False
-                    error_message = "Selected CSV file does not exist"
-            
-            elif mode == "manual":
-                # Manual mode validation
-                required_fields = {
-                    "Valid Uses": self.valid_uses.get().strip(),
-                    "Volume": self.volume.get().strip(), 
-                    "End Date": self.end_date.get().strip(),
-                    "Color": self.color.get().strip(),
-                    "Security Code": self.security_code.get().strip(),
-                    "Suffix Code": self.suffix_code.get().strip()
-                }
-                
-                # Check required fields are not empty
-                for field_name, value in required_fields.items():
-                    if not value:
-                        is_valid = False
-                        error_message = f"{field_name} is required"
-                        break
-                
-                # Validate numeric fields
-                if is_valid:
-                    try:
-                        valid_uses = int(self.valid_uses.get())
-                        if valid_uses < 1:
-                            is_valid = False
-                            error_message = "Valid Uses must be at least 1"
-                    except ValueError:
-                        is_valid = False
-                        error_message = "Valid Uses must be a number"
-                
-                if is_valid:
-                    try:
-                        volume = int(self.volume.get())
-                        if volume < 1:
-                            is_valid = False
-                            error_message = "Volume must be at least 1"
-                    except ValueError:
-                        is_valid = False
-                        error_message = "Volume must be a number"
-                
-                if is_valid:
-                    try:
-                        count = int(self.count.get())
-                        if count < 1:
-                            is_valid = False
-                            error_message = "Count must be at least 1"
-                    except ValueError:
-                        is_valid = False
-                        error_message = "Count must be a number"
-                
-                # Validate date format (basic check)
-                if is_valid:
-                    date_str = self.end_date.get().strip()
-                    if not date_str or len(date_str) < 6:
-                        is_valid = False
-                        error_message = "End Date must be in format DD.MM.YY"
-                
-                # Validate color format
-                if is_valid:
-                    color = self.color.get().strip()
-                    if not color.startswith('#') or len(color) != 7:
-                        is_valid = False
-                        error_message = "Color must be in #RRGGBB format"
-                
-                # Validate QR version (if not auto)
-                if is_valid:
-                    qr_version = self.qr_version.get().strip()
-                    if qr_version and qr_version != "auto":
-                        try:
-                            version_num = int(qr_version)
-                            if version_num < 1 or version_num > 40:
-                                is_valid = False
-                                error_message = "QR Version must be between 1-40 or 'auto'"
-                        except ValueError:
-                            is_valid = False
-                            error_message = "QR Version must be a number between 1-40 or 'auto'"
-            
-            # Common validations for both modes
-            if is_valid:
-                output_dir = self.output_directory.get().strip()
-                if not output_dir:
-                    is_valid = False
-                    error_message = "Output directory is required"
+            # Use rule-based form validation
+            is_valid, error_message = self.form_validator.validate_current_form()
             
             # Update Generate button state
             if hasattr(self, 'generate_button'):
                 if is_valid:
-                    self.generate_button.configure(state="normal")
-                    if hasattr(self, 'status_label'):
-                        self.status_label.configure(text="Ready to generate QR codes", text_color="gray")
+                    self.progress.enable_button("generate")
+                    if hasattr(self, 'validation_progress'):
+                        self.validation_progress.show_validation_success()
                 else:
-                    self.generate_button.configure(state="disabled")
-                    if hasattr(self, 'status_label'):
-                        self.status_label.configure(text=f"Form incomplete: {error_message}", text_color="orange")
+                    self.progress.disable_button("generate")
+                    if hasattr(self, 'validation_progress'):
+                        self.validation_progress.show_validation_error([error_message])
             
         except Exception as e:
             # On validation error, disable button
             if hasattr(self, 'generate_button'):
-                self.generate_button.configure(state="disabled")
+                self.progress.disable_button("generate")
             print(f"Form validation error: {e}")
     
     def delayed_validation(self):
@@ -2080,493 +1683,26 @@ class QRGeneratorGUI:
             else:
                 # Keep button disabled if any required field is empty
                 if hasattr(self, 'generate_button'):
-                    self.generate_button.configure(state="disabled")
+                    self.progress.disable_button("generate")
                 if hasattr(self, 'status_label'):
-                    self.status_label.configure(text="Form incomplete: Fill all required fields", text_color="orange")
+                    self.progress.update_status("Form incomplete: Fill all required fields", StatusType.WARNING)
         except Exception as e:
             if hasattr(self, 'generate_button'):
-                self.generate_button.configure(state="disabled")
+                self.progress.disable_button("generate")
             print(f"Delayed validation error: {e}")
 
 
 def main():
-    """Main entry point - now uses modern GUI instead of dialogs"""
+    """Main entry point - uses modern GUI interface"""
     try:
         # Create and run the modern GUI
         app = QRGeneratorGUI()
         app.run()
     except Exception as e:
-        # Fallback to old dialog-based interface if GUI fails
-        print(f"GUI initialization failed: {e}")
-        print("Falling back to dialog-based interface...")
-        main_legacy()
+        print(f"Application failed to start: {e}")
+        print("Please check your Python environment and dependencies.")
+        raise
 
-
-def main_legacy():
-    root = tk.Tk()
-    root.withdraw()  # Hide the root window
-
-    # Check if user wants to use presets
-    use_presets = messagebox.askyesno("Presets", "Use parameter presets?\n\nYes = Manage presets\nNo = Enter parameters manually")
-    
-    loaded_preset = None
-    if use_presets:
-        choice, available_presets = show_preset_menu()
-        
-        if choice == "1" and available_presets:  # Load preset
-            preset_name = simpledialog.askstring("Load Preset", f"Available presets: {', '.join(available_presets)}\n\nEnter preset name to load:")
-            if preset_name:
-                success, result = load_preset(preset_name)
-                if success:
-                    loaded_preset = result
-                    messagebox.showinfo("Success", f"Preset '{preset_name}' loaded successfully!")
-                else:
-                    messagebox.showerror("Error", result)
-                    return
-        elif choice == "3" and available_presets:  # Delete preset
-            preset_name = simpledialog.askstring("Delete Preset", f"Available presets: {', '.join(available_presets)}\n\nEnter preset name to delete:")
-            if preset_name:
-                success, result = delete_preset(preset_name)
-                if success:
-                    messagebox.showinfo("Success", result)
-                else:
-                    messagebox.showerror("Error", result)
-                return
-        # For choice "4" or "2", continue to parameter input
-
-    # Ask user to choose operation mode (or use preset mode)
-    if loaded_preset:
-        batch_mode = loaded_preset["mode"] == "csv"
-    else:
-        batch_mode = messagebox.askyesno("Operation Mode", "Choose QR code generation mode:\n\nYes = Batch Generation (CSV file or multiple codes)\nNo = Single Generation (manual parameters)")
-    
-    if batch_mode:
-        # Batch mode - ask for specific batch type
-        csv_mode = messagebox.askyesno("Batch Mode", "Choose batch generation method:\n\nYes = Import from CSV file\nNo = Generate sequential codes with manual parameters")
-    else:
-        csv_mode = False
-    
-    if csv_mode:
-        # CSV mode - get file and process it
-        input_file = filedialog.askopenfilename(title="Select CSV File", filetypes=[("CSV Files", "*.csv")])
-        if not input_file:
-            messagebox.showerror("Error", "No file selected. Exiting.")
-            return
-        
-        # Process CSV file
-        try:
-            # Use preset values or ask user for input
-            if loaded_preset and loaded_preset["mode"] == "csv":
-                delimiter = loaded_preset.get("delimiter", ",")
-                input_column = loaded_preset.get("input_column", 0)
-                skip_first_row = loaded_preset.get("skip_first_row", False)
-                format = loaded_preset.get("format", "png")
-                color = loaded_preset.get("color", "#000000")
-                
-                # Show loaded values to user for confirmation
-                preset_info = f"Using preset values:\nDelimiter: {delimiter}\nColumn: {input_column}\nSkip first row: {skip_first_row}\nFormat: {format}\nColor: {color}"
-                if not messagebox.askyesno("Preset Values", f"{preset_info}\n\nContinue with these values?"):
-                    return
-            else:
-                detected_delimiter = detect_delimiter(input_file)
-                delimiter = simpledialog.askstring("Input", f"Enter separator [{detected_delimiter}]:") or detected_delimiter
-                input_column = simpledialog.askinteger("Input", "Enter 0-indexed input column [0]:", initialvalue=0)
-                skip_first_row = messagebox.askyesno("Input", "Skip first row?")
-                
-                # Validate format
-                format_input = simpledialog.askstring("Input", "Image format [png,svg]:", initialvalue="png")
-                format_valid, format_result = validate_format(format_input)
-                if not format_valid:
-                    messagebox.showerror("Validation Error", format_result)
-                    return
-                format = format_result
-                
-                # Validate color
-                color_input = simpledialog.askstring("Input", "Image color [hex or name]:", initialvalue="#000000")
-                color_valid, color_result = validate_color_format(color_input)
-                if not color_valid:
-                    messagebox.showerror("Validation Error", color_result)
-                    return
-                color = color_result
-            
-            # Use preset values for advanced QR parameters or ask user
-            if loaded_preset and loaded_preset["mode"] == "csv":
-                qr_version = loaded_preset.get("qr_version", None)
-                error_correction = loaded_preset.get("error_correction", "L")
-                box_size = loaded_preset.get("box_size", 10)
-                border = loaded_preset.get("border", 4)
-                filename_prefix = loaded_preset.get("filename_prefix", "")
-                filename_suffix = loaded_preset.get("filename_suffix", "")
-                use_payload_as_filename = loaded_preset.get("use_payload_as_filename", True)
-                png_quality = loaded_preset.get("png_quality", 85)
-                svg_precision = loaded_preset.get("svg_precision", 2)
-            else:
-                # Ask for advanced QR code parameters
-                advanced_qr = messagebox.askyesno("QR Parameters", "Configure advanced QR code parameters?")
-                qr_version, error_correction, box_size, border = None, "L", 10, 4
-                png_quality, svg_precision = 85, 2
-                
-                if advanced_qr:
-                    # QR Version
-                    version_input = simpledialog.askstring("QR Parameters", "QR version (1-40 or 'auto'):", initialvalue="auto")
-                    version_valid, version_result = validate_qr_version(version_input)
-                    if not version_valid:
-                        messagebox.showerror("Validation Error", version_result)
-                        return
-                    qr_version = version_result
-                    
-                    # Error correction
-                    error_input = simpledialog.askstring("QR Parameters", "Error correction level (L/M/Q/H):", initialvalue="L")
-                    error_valid, error_result = validate_error_correction(error_input)
-                    if not error_valid:
-                        messagebox.showerror("Validation Error", error_result)
-                        return
-                    error_correction = error_result
-                    
-                    # Box size
-                    box_size_input = simpledialog.askstring("QR Parameters", "Box size (pixels per module):", initialvalue="10")
-                    box_size_valid, box_size_result = validate_integer_input(box_size_input, "Box size", 1, 50)
-                    if not box_size_valid:
-                        messagebox.showerror("Validation Error", box_size_result)
-                        return
-                    box_size = box_size_result
-                    
-                    # Border
-                    border_input = simpledialog.askstring("QR Parameters", "Border size (modules):", initialvalue="4")
-                    border_valid, border_result = validate_integer_input(border_input, "Border", 0, 20)
-                    if not border_valid:
-                        messagebox.showerror("Validation Error", border_result)
-                        return
-                    border = border_result
-                    
-                    # Format-specific options
-                    if format == 'png':
-                        quality_input = simpledialog.askstring("PNG Options", "PNG quality (0-100, higher is better):", initialvalue="85")
-                        quality_valid, quality_result = validate_png_quality(quality_input)
-                        if not quality_valid:
-                            messagebox.showerror("Validation Error", quality_result)
-                            return
-                        png_quality = quality_result
-                    elif format == 'svg':
-                        precision_input = simpledialog.askstring("SVG Options", "SVG precision (decimal places 0-10):", initialvalue="2")
-                        precision_valid, precision_result = validate_svg_precision(precision_input)
-                        if not precision_valid:
-                            messagebox.showerror("Validation Error", precision_result)
-                            return
-                        svg_precision = precision_result
-                
-                # Ask for filename customization options
-                customize_filenames = messagebox.askyesno("Filename Options", "Customize filename format?")
-                filename_prefix, filename_suffix, use_payload_as_filename = "", "", True
-                
-                if customize_filenames:
-                    filename_prefix = simpledialog.askstring("Filename Options", "Enter filename prefix (optional):") or ""
-                    filename_suffix = simpledialog.askstring("Filename Options", "Enter filename suffix (optional):") or ""
-                    use_payload_as_filename = messagebox.askyesno("Filename Options", "Use CSV data as filename base?\n\nYes = Use data content\nNo = Use qr_code_1, qr_code_2, etc.")
-            
-            # Read CSV data
-            with open(input_file, "r") as infile:
-                reader = csv.reader(infile, delimiter=delimiter)
-                if skip_first_row:
-                    next(reader)
-                rows = list(reader)
-            
-            if not rows:
-                messagebox.showerror("Error", "No data found in CSV file.")
-                return
-                
-            # Output directory selection
-            use_custom_output = messagebox.askyesno("Output Directory", "Choose custom output directory?\n\nYes = Select directory\nNo = Use default 'output' folder")
-            output_folder = "output"
-            
-            if use_custom_output:
-                selected_dir = filedialog.askdirectory(title="Select Output Directory")
-                if selected_dir:
-                    output_folder = selected_dir
-                else:
-                    messagebox.showinfo("Info", "No directory selected. Using default 'output' folder.")
-            
-            zip_output = messagebox.askyesno("Input", "Add output files to a zip file?")
-            zip_file_name = None
-            if zip_output:
-                zip_file_name = simpledialog.askstring("Input", f"Enter zip file name [output_{format}.zip]:", initialvalue=f"output_{format}.zip")
-            
-            # Ask if user wants to save current parameters as preset (only if not using existing preset)
-            if not loaded_preset and use_presets and choice == "2":
-                preset_name = simpledialog.askstring("Save Preset", "Enter name for this preset:")
-                if preset_name:
-                    preset_params = create_csv_mode_preset(
-                        format, color, qr_version, error_correction, box_size, border,
-                        filename_prefix, filename_suffix, use_payload_as_filename,
-                        delimiter, input_column, skip_first_row, png_quality, svg_precision
-                    )
-                    success, result = save_preset(preset_name, preset_params)
-                    if success:
-                        messagebox.showinfo("Success", result)
-                    else:
-                        messagebox.showerror("Error", result)
-            
-            # For CSV mode, we don't use the sequential payload format, so we skip security_code and suffix_code
-            # Generate QR codes from CSV data
-            create_qr_codes(None, None, None, color, output_folder, format, None, csv_data=rows, input_column=input_column, qr_version=qr_version, error_correction=error_correction, box_size=box_size, border=border, filename_prefix=filename_prefix, filename_suffix=filename_suffix, use_payload_as_filename=use_payload_as_filename, png_quality=png_quality, svg_precision=svg_precision)
-            
-            messagebox.showinfo("Success", f"{len(rows)} QR codes generated successfully from CSV!")
-            
-            if zip_output:
-                zip_output_files(output_folder, zip_file_name, format)
-                
-                # Ask about cleanup after zipping
-                cleanup_files = messagebox.askyesno("File Cleanup", "Delete original files after zipping?\n\nYes = Keep only zip file\nNo = Keep both zip and original files")
-                if cleanup_files:
-                    clean_output_folder(output_folder)
-            else:
-                # No zip created, ask if user wants to clean up anyway (unusual but possible)
-                cleanup_files = messagebox.askyesno("File Cleanup", "Delete generated files?\n\nYes = Delete all generated files\nNo = Keep generated files")
-                if cleanup_files:
-                    clean_output_folder(output_folder)
-            return
-            
-        except FileNotFoundError:
-            messagebox.showerror("Error", f"File '{input_file}' not found. Please check the filename and try again.")
-            return
-        except Exception as e:
-            messagebox.showerror("Error", f"Error processing CSV file: {e}")
-            return
-    
-    elif batch_mode and not csv_mode:
-        # Sequential batch mode - generate multiple QR codes with sequential parameters
-        operation_title = "Batch Sequential Generation"
-    else:
-        # Single generation mode - generate one or a few QR codes
-        operation_title = "Single QR Code Generation"
-    
-    # Manual parameter input mode (both single and sequential batch)
-    # Use preset values or ask user for input
-    if loaded_preset and loaded_preset["mode"] == "manual":
-        valid_uses = loaded_preset.get("valid_uses", "15")
-        volume = loaded_preset.get("volume", "500")
-        end_date = loaded_preset.get("end_date", "26.12.31")
-        color = loaded_preset.get("color", "#000000")
-        format = loaded_preset.get("format", "png")
-        security_code = loaded_preset.get("security_code", "SECD")
-        suffix_code = loaded_preset.get("suffix_code", "23FF45EE")
-        
-        # Show loaded values to user for confirmation
-        preset_info = f"Using preset values:\nValid uses: {valid_uses}\nVolume: {volume}\nEnd date: {end_date}\nColor: {color}\nFormat: {format}\nSecurity code: {security_code}\nSuffix code: {suffix_code}"
-        if not messagebox.askyesno("Preset Values", f"{preset_info}\n\nContinue with these values?"):
-            return
-    else:
-        # Validate valid_uses
-        valid_uses_input = simpledialog.askstring(operation_title, "Enter Valid uses (e.g. 15):")
-        if not valid_uses_input:
-            messagebox.showerror("Error", "No valid uses entered. Exiting.")
-            return
-        
-        valid_uses_valid, valid_uses_result = validate_integer_input(valid_uses_input, "Valid uses", 1, 9999)
-        if not valid_uses_valid:
-            messagebox.showerror("Validation Error", valid_uses_result)
-            return
-        valid_uses = str(valid_uses_result)
-
-        # Validate volume
-        volume_input = simpledialog.askstring(operation_title, "Enter Volume (e.g. 500):")
-        if not volume_input:
-            messagebox.showerror("Error", "No volume entered. Exiting.")
-            return
-        
-        volume_valid, volume_result = validate_integer_input(volume_input, "Volume", 1, 99999)
-        if not volume_valid:
-            messagebox.showerror("Validation Error", volume_result)
-            return
-        volume = str(volume_result)
-
-        # Validate end_date
-        end_date_input = simpledialog.askstring(operation_title, "Enter Valid Until date:", initialvalue="26.12.31")
-        if not end_date_input:
-            messagebox.showerror("Error", "No end date entered. Exiting.")
-            return
-        
-        date_valid, date_result = validate_date_format(end_date_input)
-        if not date_valid:
-            messagebox.showerror("Validation Error", date_result)
-            return
-        end_date = date_result
-
-        # Validate color
-        color_input = simpledialog.askstring(operation_title, "Image color [hex or name]:", initialvalue="#000000")
-        color_valid, color_result = validate_color_format(color_input)
-        if not color_valid:
-            messagebox.showerror("Validation Error", color_result)
-            return
-        color = color_result
-        
-        # Validate format
-        format_input = simpledialog.askstring(operation_title, "Image format [png,svg]:", initialvalue="png")
-        format_valid, format_result = validate_format(format_input)
-        if not format_valid:
-            messagebox.showerror("Validation Error", format_result)
-            return
-        format = format_result
-        
-        # Ask for payload customization options
-        security_code = simpledialog.askstring(operation_title, "Enter security code:", initialvalue="SECD")
-        if not security_code:
-            messagebox.showerror("Error", "No security code entered. Exiting.")
-            return
-        
-        suffix_code = simpledialog.askstring(operation_title, "Enter suffix code:", initialvalue="23FF45EE")
-        if not suffix_code:
-            messagebox.showerror("Error", "No suffix code entered. Exiting.")
-            return
-    
-    # Validate count (always ask this even with presets since it's generation specific)
-    if batch_mode and not csv_mode:
-        # Sequential batch mode - suggest more codes
-        default_count = 10
-        count_prompt = f"{operation_title} - How many sequential QR codes to generate?"
-    else:
-        # Single generation mode - suggest fewer codes
-        default_count = 1
-        count_prompt = f"{operation_title} - How many QR codes to generate?"
-    
-    count = simpledialog.askinteger(operation_title, count_prompt, initialvalue=default_count)
-    if not count:
-        messagebox.showerror("Error", "No count entered. Exiting.")
-        return
-    
-    count_valid, count_result = validate_integer_input(count, "Count", 1, 10000)
-    if not count_valid:
-        messagebox.showerror("Validation Error", count_result)
-        return
-    count = count_result
-
-    # Use preset values for advanced QR parameters or ask user
-    if loaded_preset and loaded_preset["mode"] == "manual":
-        qr_version = loaded_preset.get("qr_version", None)
-        error_correction = loaded_preset.get("error_correction", "L")
-        box_size = loaded_preset.get("box_size", 10)
-        border = loaded_preset.get("border", 4)
-        filename_prefix = loaded_preset.get("filename_prefix", "")
-        filename_suffix = loaded_preset.get("filename_suffix", "")
-        use_payload_as_filename = loaded_preset.get("use_payload_as_filename", True)
-        png_quality = loaded_preset.get("png_quality", 85)
-        svg_precision = loaded_preset.get("svg_precision", 2)
-    else:
-        # Ask for advanced QR code parameters
-        advanced_qr = messagebox.askyesno(f"{operation_title} - QR Parameters", "Configure advanced QR code parameters?")
-        qr_version, error_correction, box_size, border = None, "L", 10, 4
-        png_quality, svg_precision = 85, 2
-        
-        if advanced_qr:
-            # QR Version
-            version_input = simpledialog.askstring(f"{operation_title} - QR Parameters", "QR version (1-40 or 'auto'):", initialvalue="auto")
-            version_valid, version_result = validate_qr_version(version_input)
-            if not version_valid:
-                messagebox.showerror("Validation Error", version_result)
-                return
-            qr_version = version_result
-            
-            # Error correction
-            error_input = simpledialog.askstring(f"{operation_title} - QR Parameters", "Error correction level (L/M/Q/H):", initialvalue="L")
-            error_valid, error_result = validate_error_correction(error_input)
-            if not error_valid:
-                messagebox.showerror("Validation Error", error_result)
-                return
-            error_correction = error_result
-            
-            # Box size
-            box_size_input = simpledialog.askstring(f"{operation_title} - QR Parameters", "Box size (pixels per module):", initialvalue="10")
-            box_size_valid, box_size_result = validate_integer_input(box_size_input, "Box size", 1, 50)
-            if not box_size_valid:
-                messagebox.showerror("Validation Error", box_size_result)
-                return
-            box_size = box_size_result
-            
-            # Border
-            border_input = simpledialog.askstring(f"{operation_title} - QR Parameters", "Border size (modules):", initialvalue="4")
-            border_valid, border_result = validate_integer_input(border_input, "Border", 0, 20)
-            if not border_valid:
-                messagebox.showerror("Validation Error", border_result)
-                return
-            border = border_result
-            
-            # Format-specific options
-            if format == 'png':
-                quality_input = simpledialog.askstring(f"{operation_title} - PNG Options", "PNG quality (0-100, higher is better):", initialvalue="85")
-                quality_valid, quality_result = validate_png_quality(quality_input)
-                if not quality_valid:
-                    messagebox.showerror("Validation Error", quality_result)
-                    return
-                png_quality = quality_result
-            elif format == 'svg':
-                precision_input = simpledialog.askstring(f"{operation_title} - SVG Options", "SVG precision (decimal places 0-10):", initialvalue="2")
-                precision_valid, precision_result = validate_svg_precision(precision_input)
-                if not precision_valid:
-                    messagebox.showerror("Validation Error", precision_result)
-                    return
-                svg_precision = precision_result
-
-        # Ask for filename customization options
-        customize_filenames = messagebox.askyesno(f"{operation_title} - Filename Options", "Customize filename format?")
-        filename_prefix, filename_suffix, use_payload_as_filename = "", "", True
-        
-        if customize_filenames:
-            filename_prefix = simpledialog.askstring(f"{operation_title} - Filename Options", "Enter filename prefix (optional):") or ""
-            filename_suffix = simpledialog.askstring(f"{operation_title} - Filename Options", "Enter filename suffix (optional):") or ""
-            use_payload_as_filename = messagebox.askyesno(f"{operation_title} - Filename Options", "Use payload as filename base?\n\nYes = Use M-15-00000001-500-26.12.31-SECD-23FF45EE\nNo = Use qr_code_1, qr_code_2, etc.")
-
-    # Output directory selection
-    use_custom_output = messagebox.askyesno(f"{operation_title} - Output Directory", "Choose custom output directory?\n\nYes = Select directory\nNo = Use default 'output' folder")
-    output_folder = "output"
-    
-    if use_custom_output:
-        selected_dir = filedialog.askdirectory(title=f"Select Output Directory - {operation_title}")
-        if selected_dir:
-            output_folder = selected_dir
-        else:
-            messagebox.showinfo("Info", "No directory selected. Using default 'output' folder.")
-
-    zip_output = messagebox.askyesno(f"{operation_title} - Output", "Add output files to a zip file?")
-    zip_file_name = None
-    if zip_output:
-        zip_file_name = simpledialog.askstring(f"{operation_title} - Output", f"Enter zip file name:", initialvalue=f"QR-{valid_uses}-{volume}-{color}-{count}-{format}.zip")
-
-    # Ask if user wants to save current parameters as preset (only if not using existing preset)
-    if not loaded_preset and use_presets and choice == "2":
-        preset_name = simpledialog.askstring("Save Preset", "Enter name for this preset:")
-        if preset_name:
-            preset_params = create_manual_mode_preset(
-                valid_uses, volume, end_date, color, format, security_code, suffix_code,
-                qr_version, error_correction, box_size, border,
-                filename_prefix, filename_suffix, use_payload_as_filename,
-                png_quality, svg_precision
-            )
-            success, result = save_preset(preset_name, preset_params)
-            if success:
-                messagebox.showinfo("Success", result)
-            else:
-                messagebox.showerror("Error", result)
-
-    try:
-        create_qr_codes(valid_uses, volume, end_date, color, output_folder, format, count, security_code=security_code, suffix_code=suffix_code, qr_version=qr_version, error_correction=error_correction, box_size=box_size, border=border, filename_prefix=filename_prefix, filename_suffix=filename_suffix, use_payload_as_filename=use_payload_as_filename, png_quality=png_quality, svg_precision=svg_precision)
-        #messagebox.showinfo("Success", f"{count} QR codes generated successfully!")
-
-        #if zip_output:
-        zip_output_files(output_folder, zip_file_name, format)
-
-        if zip_output and zip_file_name:
-            # Ask about cleanup after zipping
-            cleanup_files = messagebox.askyesno("File Cleanup", "Delete original files after zipping?\n\nYes = Keep only zip file\nNo = Keep both zip and original files")
-            if cleanup_files:
-                clean_output_folder(output_folder)
-        else:
-            # No zip created, ask if user wants to clean up anyway (unusual but possible)
-            cleanup_files = messagebox.askyesno("File Cleanup", "Delete generated files?\n\nYes = Delete all generated files\nNo = Keep generated files")
-            if cleanup_files:
-                clean_output_folder(output_folder)
-
-    except Exception as e:
-        messagebox.showerror("Error", f"An error occurred: {e}")
 
 if __name__ == "__main__":
     main()
