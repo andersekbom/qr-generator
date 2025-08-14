@@ -130,7 +130,7 @@ class QRGeneratorGUI:
         """Create the main window layout with sections"""
         # Configure grid weights for responsive layout
         self.root.grid_columnconfigure(0, weight=1)
-        self.root.grid_rowconfigure(1, weight=1)
+        self.root.grid_rowconfigure(2, weight=1)
         
         # Menu bar (Task 33)
         self.create_menu_bar()
@@ -138,11 +138,11 @@ class QRGeneratorGUI:
         # Header section
         self.create_header_section()
         
-        # Main content area (scrollable)
-        self.create_content_area()
-        
-        # Footer with action buttons
+        # Footer with action buttons (create first to initialize status_label)
         self.create_footer_section()
+        
+        # Main content area (scrollable) 
+        self.create_content_area()
         
     
     def create_menu_bar(self):
@@ -219,7 +219,7 @@ class QRGeneratorGUI:
         """Create scrollable content area for all settings"""
         # Create scrollable frame
         self.content_frame = ctk.CTkScrollableFrame(self.root)
-        self.content_frame.grid(row=1, column=0, sticky="nsew", padx=20, pady=10)
+        self.content_frame.grid(row=2, column=0, sticky="nsew", padx=20, pady=10)
         self.content_frame.grid_columnconfigure(0, weight=1)
         
         # Placeholder sections (will be implemented in subsequent tasks)
@@ -277,7 +277,7 @@ class QRGeneratorGUI:
     def create_footer_section(self):
         """Create footer with main action buttons"""
         footer_frame = ctk.CTkFrame(self.root)
-        footer_frame.grid(row=2, column=0, sticky="ew", padx=20, pady=(10, 20))
+        footer_frame.grid(row=1, column=0, sticky="ew", padx=20, pady=(10, 20))
         footer_frame.grid_columnconfigure(1, weight=1)
         
         # Generate button (starts disabled until form is valid)
